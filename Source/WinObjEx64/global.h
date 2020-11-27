@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.87
 *
-*  DATE:        12 July 2020
+*  DATE:        26 Nov 2020
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -34,8 +34,6 @@
 #pragma warning(disable: 6255 6263) // alloca
 #pragma warning(disable: 6320) // Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER.
 #pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up.
-#pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
-#pragma warning(disable: 26493) // Don't use C style casts
 
 // C++ meaningless warnings
 #pragma warning(disable: 26446)
@@ -43,7 +41,9 @@
 #pragma warning(disable: 26482)
 #pragma warning(disable: 26485)
 #pragma warning(disable: 26489)
+#pragma warning(disable: 26493) // Don't use C style casts
 #pragma warning(disable: 26494)
+#pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
 
 //
 // Included lib files used by program.
@@ -132,11 +132,17 @@ extern pqsort rtl_qsort;
 #define RtlStringCchPrintfSecure rtl_swprintf_s
 #define RtlQuickSort rtl_qsort
 
+typedef struct _WINOBJ_PORT_GLOBAL {
+    BOOLEAN Initialized;
+    USHORT AlpcPortTypeIndex;
+} WINOBJ_PORT_GLOBAL, * PWINOBJ_PORT_GLOBAL;
+
 typedef struct _WINOBJ_GLOBALS {
     BOOLEAN IsWine;
     BOOLEAN EnableFullMitigations;
     BOOLEAN ListViewDisplayGrid;
     ULONG CurrentDPI;
+    WINOBJ_PORT_GLOBAL AlpcPortTypeInfo;
     HINSTANCE hInstance;
     HANDLE Heap;
     LPWSTR CurrentObjectPath;

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       TESTUNIT.H
 *
-*  VERSION:     1.80
+*  VERSION:     1.88
 *
-*  DATE:        16 July 2019
+*  DATE:        26 Nov 2020
 *
 *  Common header file for test code.
 *
@@ -18,6 +18,7 @@
 *******************************************************************************/
 #pragma once
 
-VOID TestStart();
-VOID TestStop();
+VOID TestStart(VOID);
+VOID TestStop(VOID);
 VOID TestException(_In_ BOOL bNaked);
+HANDLE TestGetPortHandle();

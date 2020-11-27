@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        22 July 2020
+*  DATE:        26 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -360,6 +360,49 @@ VOID supClipboardCopy(
 }
 
 /*
+* supQueryObjectFromHandleEx
+*
+* Purpose:
+*
+* Return object kernel address from handle in current process handle table.
+* Handle table dump supplied as parameter.
+*
+*/
+BOOL supQueryObjectFromHandleEx(
+    _In_ PSYSTEM_HANDLE_INFORMATION_EX HandlesDump,
+    _In_ HANDLE Object,
+    _Out_opt_ ULONG_PTR* Address,
+    _Out_opt_ USHORT* TypeIndex
+)
+{
+    ULONG_PTR   i;
+    BOOL        bFound = FALSE;
+    DWORD       CurrentProcessId = GetCurrentProcessId();
+
+    if (Address)
+        *Address = 0;
+    if (TypeIndex)
+        *TypeIndex = 0;
+
+    for (i = 0; i < HandlesDump->NumberOfHandles; i++) {
+        if (HandlesDump->Handles[i].UniqueProcessId == (ULONG_PTR)CurrentProcessId) {
+            if (HandlesDump->Handles[i].HandleValue == (ULONG_PTR)Object) {
+                if (Address) {
+                    *Address = (ULONG_PTR)HandlesDump->Handles[i].Object;
+                }
+                if (TypeIndex) {
+                    *TypeIndex = HandlesDump->Handles[i].ObjectTypeIndex;
+                }
+                bFound = TRUE;
+                break;
+            }
+        }
+    }
+
+    return bFound;
+}
+
+/*
 * supQueryObjectFromHandle
 *
 * Purpose:
@@ -373,11 +416,7 @@ BOOL supQueryObjectFromHandle(
     _Out_opt_ USHORT* TypeIndex
 )
 {
-    BOOL   bFound = FALSE;
-    DWORD  CurrentProcessId = GetCurrentProcessId();
-
-    ULONG_PTR i;
-
+    BOOL bFound = FALSE;
     PSYSTEM_HANDLE_INFORMATION_EX pHandles;
 
     if (Address)
@@ -391,18 +430,12 @@ BOOL supQueryObjectFromHandle(
 
     pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation, NULL);
     if (pHandles) {
-        for (i = 0; i < pHandles->NumberOfHandles; i++) {
-            if (pHandles->Handles[i].UniqueProcessId == (ULONG_PTR)CurrentProcessId) {
-                if (pHandles->Handles[i].HandleValue == (ULONG_PTR)Object) {
-                    *Address = (ULONG_PTR)pHandles->Handles[i].Object;
-                    if (TypeIndex) {
-                        *TypeIndex = pHandles->Handles[i].ObjectTypeIndex;
-                    }
-                    bFound = TRUE;
-                    break;
-                }
-            }
-        }
+
+        bFound = supQueryObjectFromHandleEx(pHandles,
+            Object,
+            Address,
+            TypeIndex);
+
         supHeapFree(pHandles);
     }
     return bFound;
@@ -1440,6 +1473,8 @@ VOID supInit(
         ultohex(status, _strend(szError));
         logAdd(WOBJ_LOG_ENTRY_ERROR, szError);
     }
+
+    supRegisterAlpcPortDummy();
 
     //
     // Remember current DPI value.
@@ -4036,6 +4071,295 @@ NTSTATUS supOpenNamedObjectByType(
 }
 
 /*
+* supEnumHandleDump
+*
+* Purpose:
+*
+* Execute callback over each handle dump entry.
+*
+* Return TRUE if enumeration callback stops enumeration.
+*
+*/
+BOOL supEnumHandleDump(
+    _In_ PSYSTEM_HANDLE_INFORMATION_EX HandleDump,
+    _In_ PENUMERATE_HANDLE_DUMP_CALLBACK EnumCallback,
+    _In_ PVOID UserContext
+)
+{
+    ULONG_PTR i;
+
+    for (i = 0; i < HandleDump->NumberOfHandles; i++) {
+        if (EnumCallback(&HandleDump->Handles[i],
+            UserContext)) 
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+typedef struct _ALPCPORT_ENUM_CONTEXT {
+    _In_ LPCWSTR ObjectFullName;
+    _Out_ HANDLE ObjectHandle;
+} ALPCPORT_ENUM_CONTEXT, * PALPCPORT_ENUM_CONTEXT;
+
+BOOL supxEnumAlpcPortsCallback(
+    _In_ SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX* HandleEntry,
+    _In_opt_ PVOID UserContext)
+{
+    BOOL        fSelfProcess = FALSE, fAlloc = FALSE, bStopEnum = FALSE;
+    ULONG       bufferSize = 4096;
+    ULONG       returnedLength = 0;
+    NTSTATUS    ntStatus;
+    HANDLE      objectHandle = NULL, processHandle = NULL;
+    BYTE        buffer[4096], *pBuffer = (PBYTE)&buffer;
+
+    PALPCPORT_ENUM_CONTEXT enumContext = (PALPCPORT_ENUM_CONTEXT)UserContext;
+    PUNICODE_STRING pusObjectName;
+
+    do {
+
+        if (enumContext == NULL)
+            break;
+
+        //
+        // Not an ALPC port, skip.
+        //
+        if (HandleEntry->ObjectTypeIndex != g_WinObj.AlpcPortTypeInfo.AlpcPortTypeIndex)
+            break;
+
+        //
+        // Not our handle, open process.
+        //
+        if (HandleEntry->UniqueProcessId != GetCurrentProcessId()) {
+
+            ntStatus = supOpenProcessEx((HANDLE)HandleEntry->UniqueProcessId,
+                PROCESS_DUP_HANDLE,
+                &processHandle);
+
+            if (!NT_SUCCESS(ntStatus))
+                break;
+
+        }
+        else {
+            //
+            // Our handle.
+            //
+            processHandle = NtCurrentProcess();
+            fSelfProcess = TRUE;
+        }
+
+        //
+        // Duplicate handle.
+        //
+        ntStatus = NtDuplicateObject(processHandle,
+            (HANDLE)HandleEntry->HandleValue,
+            NtCurrentProcess(),
+            &objectHandle,
+            STANDARD_RIGHTS_ALL,
+            0,
+            0);
+
+        if (!fSelfProcess)
+            NtClose(processHandle);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        //
+        // Query object name.
+        //
+        ntStatus = NtQueryObject(objectHandle,
+            ObjectNameInformation,
+            pBuffer,
+            bufferSize,
+            &returnedLength);
+
+        if (ntStatus == STATUS_INFO_LENGTH_MISMATCH) {
+
+            pBuffer = (PBYTE)supHeapAlloc((SIZE_T)returnedLength);
+            if (pBuffer) {
+
+                fAlloc = TRUE;
+
+                ntStatus = NtQueryObject(objectHandle,
+                    ObjectNameInformation,
+                    pBuffer,
+                    returnedLength,
+                    &returnedLength);
+
+            }
+
+        }
+
+        if (NT_SUCCESS(ntStatus)) {
+
+            pusObjectName = (PUNICODE_STRING)pBuffer;
+            if (pusObjectName->Buffer && pusObjectName->Length) {
+
+                if (0 == _strcmpi(enumContext->ObjectFullName,
+                    pusObjectName->Buffer))
+                {
+                    enumContext->ObjectHandle = objectHandle;
+                    bStopEnum = TRUE;
+                    break;
+                }
+            }
+
+        }
+
+        NtClose(objectHandle);
+
+    } while (FALSE);
+
+    if (fAlloc && pBuffer)
+        supHeapFree(pBuffer);
+
+
+    //
+    // Do not stop enumeration until condition.
+    //
+    return bStopEnum;
+}
+
+/*
+* supOpenPortObjectFromContext
+*
+* Purpose:
+*
+* Open handle for ALPC port object type using handle duplication.
+*
+* NOTE:
+* Windows only gives you handle to the port in two cases:
+*
+* 1. When you create it (NtCreatePort and similar);
+* 2. When you connect to the specified port.
+*
+*/
+NTSTATUS supOpenPortObjectFromContext(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ PROP_OBJECT_INFO* Context,
+    _In_ ACCESS_MASK DesiredAccess
+)
+{
+    NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
+    PSYSTEM_HANDLE_INFORMATION_EX pHandles = NULL;
+    LPWSTR objectFullName;
+    SIZE_T cchObjectFullName;
+    ALPCPORT_ENUM_CONTEXT enumContext;
+
+    *ObjectHandle = NULL;
+
+    /*
+    Context->PortObjectInfo.IsAllocated = TRUE;
+    Context->PortObjectInfo.ReferenceHandle = TestGetPortHandle();
+    */
+
+    if (Context->PortObjectInfo.IsAllocated) {
+
+        ntStatus = NtDuplicateObject(NtCurrentProcess(),
+            Context->PortObjectInfo.ReferenceHandle,
+            NtCurrentProcess(),
+            ObjectHandle,
+            DesiredAccess,
+            0,
+            0);
+
+    }
+    else {
+
+        do {
+
+            //
+            // Build full object name.
+            //
+            cchObjectFullName = 4 + _strlen(Context->lpCurrentObjectPath) +
+                _strlen(Context->lpObjectName) +
+                sizeof(UNICODE_NULL);
+
+            objectFullName = (LPWSTR)supHeapAlloc(cchObjectFullName * sizeof(WCHAR));
+            if (objectFullName == NULL) {
+                ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+                break;
+            }
+
+            RtlStringCchPrintfSecure(objectFullName,
+                cchObjectFullName,
+                L"%s\\%s",
+                Context->lpCurrentObjectPath,
+                Context->lpObjectName);
+
+            //
+            // Allocate handle dump.
+            //
+            pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation,
+                NULL);
+            if (pHandles == NULL) {
+                ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+                break;
+            }
+
+            //
+            // Query AlpcPort type index.
+            //
+            if (g_WinObj.AlpcPortTypeInfo.Initialized == FALSE) {
+
+                supRegisterAlpcPortDummy();
+
+                if (g_WinObj.AlpcPortTypeInfo.Initialized == FALSE) {
+                    ntStatus = STATUS_PORT_UNREACHABLE;
+                    break;
+                }
+            }
+
+            //
+            // Walk handle table looking for our named port.
+            //
+            enumContext.ObjectFullName = objectFullName;
+            enumContext.ObjectHandle = NULL;
+
+            if (supEnumHandleDump(pHandles,
+                supxEnumAlpcPortsCallback,
+                &enumContext))
+            {
+                if (enumContext.ObjectHandle) {
+
+                    //
+                    // Save handle as reference.
+                    //
+                    Context->PortObjectInfo.ReferenceHandle = enumContext.ObjectHandle;
+                    Context->PortObjectInfo.IsAllocated = TRUE;
+
+                    //
+                    // Duplicate copy with requested desired access.
+                    //
+                    ntStatus = NtDuplicateObject(NtCurrentProcess(),
+                        Context->PortObjectInfo.ReferenceHandle,
+                        NtCurrentProcess(),
+                        ObjectHandle,
+                        DesiredAccess,
+                        0,
+                        0);
+
+                }
+                else {
+                    ntStatus = STATUS_INVALID_HANDLE;
+                }
+
+            }
+
+        } while (FALSE);
+
+        if (pHandles)
+            supHeapFree(pHandles);
+
+    }
+
+    return ntStatus;
+}
+
+/*
 * supOpenObjectFromContext
 *
 * Purpose:
@@ -4054,7 +4378,6 @@ HANDLE supOpenObjectFromContext(
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     IO_STATUS_BLOCK iost;
     OBJECT_ATTRIBUTES objaNamespace;
-    CLIENT_ID clientId;
 
     if (Context->ContextType == propPrivateNamespace) {
 
@@ -4087,17 +4410,9 @@ HANDLE supOpenObjectFromContext(
 
             status = supOpenProcessEx(
                 Context->UnnamedObjectInfo.ClientId.UniqueProcess,
+                PROCESS_ALL_ACCESS,
                 &hObject);
 
-            if (!NT_SUCCESS(status)) {
-
-                clientId.UniqueProcess = Context->UnnamedObjectInfo.ClientId.UniqueProcess;
-                clientId.UniqueThread = NULL;
-
-                status = NtOpenProcess(&hObject, DesiredAccess,
-                    ObjectAttributes,
-                    &clientId);
-            }
         }
         else
             status = STATUS_INVALID_PARAMETER;
@@ -4182,6 +4497,15 @@ HANDLE supOpenObjectFromContext(
         else
             status = STATUS_PROCEDURE_NOT_FOUND;
         break;
+
+    case ObjectTypePort:
+
+        status = supOpenPortObjectFromContext(&hObject, 
+            Context, 
+            DesiredAccess); //variable access
+
+        break;
+    
     default:
         status = STATUS_OBJECTID_NOT_FOUND;
         break;
@@ -4559,6 +4883,7 @@ NTSTATUS supDeviceIoControlProcExp(
 */
 NTSTATUS supOpenProcessEx(
     _In_ HANDLE UniqueProcessId,
+    _In_ ACCESS_MASK DesiredAccess,
     _Out_ PHANDLE ProcessHandle
 )
 {
@@ -4574,9 +4899,13 @@ NTSTATUS supOpenProcessEx(
         (PVOID)&processHandle,
         sizeof(processHandle));
 
-    if (NT_SUCCESS(status))
-        *ProcessHandle = processHandle;
+    if (!NT_SUCCESS(status)) {
+        status = supOpenProcess(UniqueProcessId,
+            DesiredAccess,
+            &processHandle);
+    }
 
+    *ProcessHandle = processHandle;
     return status;
 }
 
@@ -6269,4 +6598,53 @@ VOID supJumpToFileListView(
 
     if (lpDriverName) supHeapFree(lpDriverName);
     if (lpConvertedName) supHeapFree(lpConvertedName);
+}
+
+/*
+* supRegisterAlpcPortDummy
+*
+* Purpose:
+*
+* Create WinObjEx ALPC port for object type reference.
+*
+*/
+VOID supRegisterAlpcPortDummy(
+    VOID
+)
+{
+    NTSTATUS ntStatus;
+    HANDLE portHandle = NULL;
+    UNICODE_STRING portName = RTL_CONSTANT_STRING(L"\\Rpc Control\\WinObjExPort");
+    OBJECT_ATTRIBUTES objectAttributes;
+    PSYSTEM_HANDLE_INFORMATION_EX pHandles = NULL;
+
+
+    InitializeObjectAttributes(&objectAttributes, &portName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+    ntStatus = NtCreatePort(&portHandle,
+        &objectAttributes,
+        0,
+        sizeof(PORT_MESSAGE),
+        0);
+
+    if (NT_SUCCESS(ntStatus)) {
+
+        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation,
+            NULL);
+        if (pHandles) {
+
+            //
+            // Query ALPC port object type.
+            //
+            if (supQueryObjectFromHandleEx(pHandles,
+                portHandle,
+                NULL,
+                &g_WinObj.AlpcPortTypeInfo.AlpcPortTypeIndex))
+            {
+                g_WinObj.AlpcPortTypeInfo.Initialized = TRUE;
+            }
+
+            supHeapFree(pHandles);
+        }
+    }
 }

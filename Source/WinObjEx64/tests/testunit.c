@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        20 Oct 2020
+*  DATE:        26 Nov 2020
 *
 *  Test code used while debug.
 *
@@ -43,6 +43,11 @@ typedef struct _QUERY_REQUEST {
 } QUERY_REQUEST, *PQUERY_REQUEST;
 
 #define WOBJEX_TEST_PORT L"\\Rpc Control\\WinObjEx_ServiceTestPort48429"
+
+HANDLE TestGetPortHandle()
+{
+    return g_PortHandle;
+}
 
 DWORD WINAPI LPCListener(LPVOID lpThreadParameter)
 {
@@ -886,7 +891,7 @@ VOID TestStart(
     //TestLicenseCache();
     //TestApiSetResolve();
     //TestDesktop();
-    //TestApiPort();
+    TestApiPort();
     //TestDebugObject();
     //TestMailslot();
     //TestPartition();

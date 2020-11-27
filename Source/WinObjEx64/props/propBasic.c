@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        22 July 2020
+*  DATE:        26 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -474,10 +474,44 @@ VOID propSetProcessMitigationsInfo(
         &Policies.UserShadowStackPolicy))
     {
         if (Policies.UserShadowStackPolicy.Flags) {
+
             if (Policies.UserShadowStackPolicy.EnableUserShadowStack) {
                 _strcpy(szBuffer, TEXT("UserShadowStack -> Enabled"));
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
             }
+            if (Policies.UserShadowStackPolicy.AuditUserShadowStack) {
+                _strcpy(szBuffer, TEXT("AuditUserShadowStack -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.SetContextIpValidation) {
+                _strcpy(szBuffer, TEXT("SetContextIpValidation -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.AuditSetContextIpValidation) {
+                _strcpy(szBuffer, TEXT("AuditSetContextIpValidation -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.EnableUserShadowStackStrictMode) {
+                _strcpy(szBuffer, TEXT("EnableUserShadowStackStrictMode -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.BlockNonCetBinaries) {
+                _strcpy(szBuffer, TEXT("BlockNonCetBinaries -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.BlockNonCetBinariesNonEhcont) {
+                _strcpy(szBuffer, TEXT("BlockNonCetBinariesNonEhcont -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.AuditBlockNonCetBinaries) {
+                _strcpy(szBuffer, TEXT("AuditBlockNonCetBinaries -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.CetDynamicApisOutOfProcOnly) {
+                _strcpy(szBuffer, TEXT("CetDynamicApisOutOfProcOnly -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
         }
     }
 

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        22 July 2020
+*  DATE:        26 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -86,7 +86,6 @@ BOOL propOpenCurrentObject(
     //
     if (
         (Context->TypeIndex == ObjectTypeUnknown) ||
-        (Context->TypeIndex == ObjectTypePort) ||
         (Context->TypeIndex == ObjectTypeFltConnPort) ||
         (Context->TypeIndex == ObjectTypeFltComnPort) ||
         (Context->TypeIndex == ObjectTypeWaitablePort)
@@ -405,6 +404,11 @@ VOID propContextDestroy(
         if (Context->ContextType == propUnnamed) {
             if (Context->UnnamedObjectInfo.ImageName.Buffer)
                 supHeapFree(Context->UnnamedObjectInfo.ImageName.Buffer);
+        }
+
+        if (Context->PortObjectInfo.IsAllocated) {
+            if (Context->PortObjectInfo.ReferenceHandle)
+                NtClose(Context->PortObjectInfo.ReferenceHandle);
         }
 
         //free context itself

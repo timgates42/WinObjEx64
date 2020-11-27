@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.155
+*  VERSION:     1.157
 *
-*  DATE:        14 Sep 2020
+*  DATE:        26 Nov 2020
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -5562,7 +5562,15 @@ typedef struct _PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY_W10 {
         DWORD Flags;
         struct {
             DWORD EnableUserShadowStack : 1;
-            DWORD ReservedFlags : 31;
+            DWORD AuditUserShadowStack : 1;
+            DWORD SetContextIpValidation : 1;
+            DWORD AuditSetContextIpValidation : 1;
+            DWORD EnableUserShadowStackStrictMode : 1;
+            DWORD BlockNonCetBinaries : 1;
+            DWORD BlockNonCetBinariesNonEhcont : 1;
+            DWORD AuditBlockNonCetBinaries : 1;
+            DWORD CetDynamicApisOutOfProcOnly : 1;
+            DWORD ReservedFlags : 23;
         } DUMMYSTRUCTNAME;
     } DUMMYUNIONNAME;
 } PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY_W10, * PPROCESS_MITIGATION_USER_SHADOW_STACK_POLICY_W10;

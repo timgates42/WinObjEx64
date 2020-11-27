@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        13 July 2020
+*  DATE:        26 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -682,7 +682,7 @@ LPWSTR PsListGetThreadStateAsString(
 
         _strcpy(StateBuffer, TEXT("Wait:"));
 
-        if (WaitReason < MAX_KNOWN_WAITREASON)
+        if (WaitReason >= 0 && WaitReason < MAX_KNOWN_WAITREASON)
             lpWaitReason = T_WAITREASON[WaitReason];
 
         _strcat(StateBuffer, lpWaitReason);

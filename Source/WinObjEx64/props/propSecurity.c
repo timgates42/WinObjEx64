@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.87
 *
-*  DATE:        11 July 2020
+*  DATE:        26 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,7 +31,8 @@ BOOL propSecurityObjectSupported(
     _In_ UINT nTypeIndex
 )
 {
-    if ((nTypeIndex != ObjectTypeFile) &&
+    if ((nTypeIndex != ObjectTypePort) &&
+        (nTypeIndex != ObjectTypeFile) &&
         (nTypeIndex != ObjectTypeDirectory) &&
         (nTypeIndex != ObjectTypeDevice) &&
         (nTypeIndex != ObjectTypeSection) &&
@@ -162,6 +163,11 @@ PSI_ACCESS propGetAccessTable(
     case ObjectTypeToken:
         This->dwAccessMax = MAX_KNOWN_TOKEN_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&TokenAccessValues;
+        break;
+
+    case ObjectTypePort:
+        This->dwAccessMax = MAX_KNOWN_PORT_ACCESS_VALUE;
+        AccessTable = (PSI_ACCESS)&PortAccessValues;
         break;
     }
 

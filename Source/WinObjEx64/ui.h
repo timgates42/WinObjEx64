@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        18 Oct 2020
+*  DATE:        26 Nov 2020
 *
 *  Common header file for the user interface.
 *
@@ -57,8 +57,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       1
 #define PROGRAM_MINOR_VERSION       8
-#define PROGRAM_REVISION_NUMBER     7
-#define PROGRAM_BUILD_NUMBER        2010
+#define PROGRAM_REVISION_NUMBER     8
+#define PROGRAM_BUILD_NUMBER        2011
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
@@ -189,6 +189,11 @@ typedef struct _PROP_UNNAMED_OBJECT_INFO {
     BOOL IsThreadToken;
 } PROP_UNNAMED_OBJECT_INFO, *PPROP_UNNAMED_OBJECT_INFO;
 
+typedef struct _PROP_PORT_OBJECT {
+    BOOL IsAllocated;
+    HANDLE ReferenceHandle;
+} PROP_PORT_OBJECT, * PPROP_PORT_OBJECT;
+
 typedef struct _PROP_OBJECT_INFO {
     PROP_CONTEXT_TYPE ContextType;
     BOOL IsType; //TRUE if selected object is an object type
@@ -206,6 +211,7 @@ typedef struct _PROP_OBJECT_INFO {
     OBJINFO ObjectInfo; //object dump related structures
     PROP_NAMESPACE_INFO NamespaceInfo;
     PROP_UNNAMED_OBJECT_INFO UnnamedObjectInfo;
+    PROP_PORT_OBJECT PortObjectInfo;
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
 #define VALIDATE_PROP_CONTEXT(Context) { if (Context == NULL) return; }

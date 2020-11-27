@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        23 July 2020
+*  DATE:        26 Nov 2020
 *
 *  Common header file for the program support routines.
 *
@@ -68,6 +68,12 @@ typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
 typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
     _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
     _In_opt_ PVOID Context
+    );
+
+// return true to stop enumeration
+typedef BOOL(CALLBACK* PENUMERATE_HANDLE_DUMP_CALLBACK)(
+    _In_ SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX *HandleEntry,
+    _In_opt_ PVOID UserContext
     );
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
@@ -199,6 +205,12 @@ BOOL supInitTreeListForDump(
 
 VOID supShowHelp(
     _In_ HWND ParentWindow);
+
+BOOL supQueryObjectFromHandleEx(
+    _In_ PSYSTEM_HANDLE_INFORMATION_EX HandlesDump,
+    _In_ HANDLE Object,
+    _Out_opt_ ULONG_PTR* Address,
+    _Out_opt_ USHORT* TypeIndex);
 
 BOOL supQueryObjectFromHandle(
     _In_ HANDLE Object,
@@ -487,6 +499,7 @@ BOOL supGetProcessMitigationPolicy(
 
 NTSTATUS supOpenProcessEx(
     _In_ HANDLE UniqueProcessId,
+    _In_ ACCESS_MASK DesiredAccess,
     _Out_ PHANDLE ProcessHandle);
 
 NTSTATUS supOpenProcessTokenEx(
@@ -652,3 +665,11 @@ VOID supStatusBarSetText(
 VOID supJumpToFileListView(
     _In_ HWND hwndList,
     _In_ INT iFileNameColumn);
+
+VOID supRegisterAlpcPortDummy(
+    VOID);
+
+BOOL supEnumHandleDump(
+    _In_ PSYSTEM_HANDLE_INFORMATION_EX HandleDump,
+    _In_ PENUMERATE_HANDLE_DUMP_CALLBACK EnumCallback,
+    _In_ PVOID UserContext);
