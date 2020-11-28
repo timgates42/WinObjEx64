@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        27 Nov 2020
 *
 *  Test code used while debug.
 *
@@ -871,6 +871,25 @@ VOID TestShadowDirectory()
     }
 }
 
+VOID TestAlpcPortOpen()
+{
+    HANDLE hObject = NULL;
+    NTSTATUS ntStatus;
+
+    ntStatus = supOpenPortObjectByName(&hObject, 
+        NULL, 
+        WOBJEX_TEST_PORT, 
+        PORT_ALL_ACCESS);
+
+    if (NT_SUCCESS(ntStatus)) {
+        Beep(0, 0);
+        NtClose(hObject);
+    }
+    else {
+        kdDebugPrint("supOpenPortObjectByName failed with NTSTATUS 0x%ul", (ULONG)ntStatus);
+    }
+}
+
 VOID PreHashTypes()
 {
     ObManagerTest();
@@ -892,6 +911,7 @@ VOID TestStart(
     //TestApiSetResolve();
     //TestDesktop();
     TestApiPort();
+    TestAlpcPortOpen();
     //TestDebugObject();
     //TestMailslot();
     //TestPartition();

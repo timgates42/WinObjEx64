@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        13 July 2020
+*  DATE:        27 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -133,6 +133,8 @@ VOID propObDumpAddressWithModule(
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
     subitems.Text[0] = T_NULL;
+    subitems.Text[1] = T_EmptyString;
+
     if (Address != NULL) {
 
         RtlSecureZeroMemory(&szValue, sizeof(szValue));
@@ -519,6 +521,9 @@ VOID propObDumpUlong64(
             subitems.FontColor = FontColor;
         }
         subitems.Text[1] = lpszDesc;
+    }
+    else {
+        subitems.Text[1] = T_EmptyString;
     }
 
     supTreeListAddItem(
@@ -1369,7 +1374,7 @@ VOID propObDumpDriverObject(
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
         subitems.Count = 2;
         subitems.Text[0] = TEXT("{...}");
-        subitems.Text[1] = NULL;
+        subitems.Text[1] = T_EmptyString;
 
         h_tviSubItem = supTreeListAddItem(
             g_TreeList,
@@ -2273,9 +2278,11 @@ VOID propObDumpDeviceMap(
             // Display DriveType array.
             //
             RtlSecureZeroMemory(&subitems, sizeof(subitems));
+
             subitems.Count = 2;
             subitems.Text[0] = T_EmptyString;
             subitems.Text[1] = T_EmptyString;
+
             h_tviDriveType = supTreeListAddItem(g_TreeList,
                 h_tviSubItem,
                 TVIF_TEXT | TVIF_STATE,

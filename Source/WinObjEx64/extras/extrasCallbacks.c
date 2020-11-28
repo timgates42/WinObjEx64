@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        21 Oct 2020
+*  DATE:        27 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2064,7 +2064,12 @@ VOID AddEntryToList(
     }
 
     TreeListSubItems.Text[0] = szBuffer;
-    TreeListSubItems.Text[1] = lpAdditionalInfo;
+    if (lpAdditionalInfo) {
+        TreeListSubItems.Text[1] = lpAdditionalInfo;
+    }
+    else {
+        TreeListSubItems.Text[1] = T_EmptyString;
+    }
 
     supTreeListAddItem(
         TreeList,
@@ -2114,7 +2119,12 @@ VOID AddZeroEntryToList(
         TreeListSubItems.Text[1] = T_CannotQuery;
     }
     else {
-        TreeListSubItems.Text[1] = lpAdditionalInfo;
+        if (lpAdditionalInfo) {
+            TreeListSubItems.Text[1] = lpAdditionalInfo;
+        }
+        else {
+            TreeListSubItems.Text[1] = T_EmptyString;
+        }
     }
 
     supTreeListAddItem(

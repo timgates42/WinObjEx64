@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        27 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1474,7 +1474,7 @@ VOID supInit(
         logAdd(WOBJ_LOG_ENTRY_ERROR, szError);
     }
 
-    supRegisterAlpcPortDummy();
+    supQueryAlpcPortObjectTypeIndex(&g_WinObj.AlpcPortTypeInfo);
 
     //
     // Remember current DPI value.
@@ -3939,6 +3939,7 @@ NTSTATUS supOpenTokenByParam(
 *  Job
 *  Session
 *  MemoryPartition
+*  AlpcPort
 *
 */
 NTSTATUS supOpenNamedObjectByType(
@@ -3953,7 +3954,10 @@ NTSTATUS supOpenNamedObjectByType(
     OBJECT_ATTRIBUTES obja;
     UNICODE_STRING ustr;
     HANDLE rootHandle = NULL, objectHandle = NULL;
-    NTSTATUS ntStatus;
+    NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
+
+    LPWSTR objectFullName = NULL;
+    SIZE_T cchObjectFullName;
 
     *ObjectHandle = NULL;
 
@@ -3973,12 +3977,56 @@ NTSTATUS supOpenNamedObjectByType(
         (TypeIndex != ObjectTypeSection) &&
         (TypeIndex != ObjectTypeJob) &&
         (TypeIndex != ObjectTypeSession) &&
-        (TypeIndex != ObjectTypeMemoryPartition))
+        (TypeIndex != ObjectTypeMemoryPartition) &&
+        (TypeIndex != ObjectTypePort))
     {
         return STATUS_INVALID_PARAMETER_2;
     }
 
     __try {
+
+        //
+        // Special ALPC port case.
+        //
+        if (TypeIndex == ObjectTypePort) {
+
+            //
+            // This case require object name.
+            //
+            if (ObjectName == NULL)
+                return STATUS_INVALID_PARAMETER_4;
+
+            //
+            // Build full object name.
+            //
+            cchObjectFullName = 4 + _strlen(ObjectDirectory) +
+                _strlen(ObjectName) +
+                sizeof(UNICODE_NULL);
+
+            objectFullName = (LPWSTR)supHeapAlloc(cchObjectFullName * sizeof(WCHAR));
+            if (objectFullName) {
+
+                RtlStringCchPrintfSecure(objectFullName,
+                    cchObjectFullName,
+                    L"%s\\%s",
+                    ObjectDirectory,
+                    ObjectName);
+
+                //
+                // Open port by name.
+                //
+                ntStatus = supOpenPortObjectByName(ObjectHandle,
+                    NULL,
+                    objectFullName,
+                    DesiredAccess);
+
+                if (objectFullName)
+                    supHeapFree(objectFullName);
+
+            }
+
+            return ntStatus;
+        }
 
         RtlInitUnicodeString(&ustr, ObjectDirectory);
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
@@ -4099,11 +4147,14 @@ BOOL supEnumHandleDump(
     return FALSE;
 }
 
-typedef struct _ALPCPORT_ENUM_CONTEXT {
-    _In_ LPCWSTR ObjectFullName;
-    _Out_ HANDLE ObjectHandle;
-} ALPCPORT_ENUM_CONTEXT, * PALPCPORT_ENUM_CONTEXT;
-
+/*
+* supxEnumAlpcPortsCallback
+*
+* Purpose:
+*
+* Port handles enumeration callback.
+*
+*/
 BOOL supxEnumAlpcPortsCallback(
     _In_ SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX* HandleEntry,
     _In_opt_ PVOID UserContext)
@@ -4224,17 +4275,111 @@ BOOL supxEnumAlpcPortsCallback(
 }
 
 /*
-* supOpenPortObjectFromContext
+* supOpenPortObjectByName
 *
 * Purpose:
 *
-* Open handle for ALPC port object type using handle duplication.
+* Open handle for ALPC port object type with handle duplication.
 *
 * NOTE:
 * Windows only gives you handle to the port in two cases:
 *
 * 1. When you create it (NtCreatePort and similar);
 * 2. When you connect to the specified port.
+*
+*/
+NTSTATUS supOpenPortObjectByName(
+    _Out_ PHANDLE ObjectHandle,
+    _Out_opt_ PHANDLE ReferenceHandle,
+    _In_ LPCWSTR ObjectName,
+    _In_ ACCESS_MASK DesiredAccess
+)
+{
+    NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
+    PSYSTEM_HANDLE_INFORMATION_EX pHandles = NULL;
+    ALPCPORT_ENUM_CONTEXT enumContext;
+
+    if (ObjectHandle)
+        *ObjectHandle = NULL;
+    if (ReferenceHandle)
+        *ReferenceHandle = NULL;
+
+    do {
+
+        //
+        // Allocate handle dump.
+        //
+        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation,
+            NULL);
+        if (pHandles == NULL) {
+            ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+            break;
+        }
+
+        //
+        // Query AlpcPort type index.
+        //
+        if (g_WinObj.AlpcPortTypeInfo.Initialized == FALSE) {
+
+            supQueryAlpcPortObjectTypeIndex(&g_WinObj.AlpcPortTypeInfo);
+
+            if (g_WinObj.AlpcPortTypeInfo.Initialized == FALSE) {
+                ntStatus = STATUS_PORT_UNREACHABLE;
+                break;
+            }
+        }
+
+        //
+           // Walk handle table looking for our named port.
+           //
+        enumContext.ObjectFullName = ObjectName;
+        enumContext.ObjectHandle = NULL;
+
+        if (supEnumHandleDump(pHandles,
+            supxEnumAlpcPortsCallback,
+            &enumContext))
+        {
+            if (enumContext.ObjectHandle) {
+
+                //
+                // Duplicate copy with requested desired access.
+                //
+                ntStatus = NtDuplicateObject(NtCurrentProcess(),
+                    enumContext.ObjectHandle,
+                    NtCurrentProcess(),
+                    ObjectHandle,
+                    DesiredAccess,
+                    0,
+                    0);
+
+                if (ReferenceHandle)
+                    *ReferenceHandle = enumContext.ObjectHandle;
+                else
+                    NtClose(enumContext.ObjectHandle);
+
+            }
+            else {
+                ntStatus = STATUS_INVALID_HANDLE;
+            }
+        }
+        else {
+            ntStatus = STATUS_PORT_CONNECTION_REFUSED;
+        }
+
+    } while (FALSE);
+
+    if (pHandles)
+        supHeapFree(pHandles);
+
+    return ntStatus;
+}
+
+/*
+* supOpenPortObjectFromContext
+*
+* Purpose:
+*
+* Open handle for ALPC port object type with handle duplication using WinObjEx64 property context.
 *
 */
 NTSTATUS supOpenPortObjectFromContext(
@@ -4244,10 +4389,9 @@ NTSTATUS supOpenPortObjectFromContext(
 )
 {
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
-    PSYSTEM_HANDLE_INFORMATION_EX pHandles = NULL;
-    LPWSTR objectFullName;
+    HANDLE refHandle = NULL;
+    LPWSTR objectFullName = NULL;
     SIZE_T cchObjectFullName;
-    ALPCPORT_ENUM_CONTEXT enumContext;
 
     *ObjectHandle = NULL;
 
@@ -4279,80 +4423,39 @@ NTSTATUS supOpenPortObjectFromContext(
                 sizeof(UNICODE_NULL);
 
             objectFullName = (LPWSTR)supHeapAlloc(cchObjectFullName * sizeof(WCHAR));
-            if (objectFullName == NULL) {
-                ntStatus = STATUS_INSUFFICIENT_RESOURCES;
-                break;
-            }
+            if (objectFullName) {
 
-            RtlStringCchPrintfSecure(objectFullName,
-                cchObjectFullName,
-                L"%s\\%s",
-                Context->lpCurrentObjectPath,
-                Context->lpObjectName);
+                RtlStringCchPrintfSecure(objectFullName,
+                    cchObjectFullName,
+                    L"%s\\%s",
+                    Context->lpCurrentObjectPath,
+                    Context->lpObjectName);
 
-            //
-            // Allocate handle dump.
-            //
-            pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation,
-                NULL);
-            if (pHandles == NULL) {
-                ntStatus = STATUS_INSUFFICIENT_RESOURCES;
-                break;
-            }
+                //
+                // Open port by name.
+                //
+                ntStatus = supOpenPortObjectByName(ObjectHandle,
+                    &refHandle,
+                    objectFullName,
+                    DesiredAccess);
 
-            //
-            // Query AlpcPort type index.
-            //
-            if (g_WinObj.AlpcPortTypeInfo.Initialized == FALSE) {
-
-                supRegisterAlpcPortDummy();
-
-                if (g_WinObj.AlpcPortTypeInfo.Initialized == FALSE) {
-                    ntStatus = STATUS_PORT_UNREACHABLE;
-                    break;
-                }
-            }
-
-            //
-            // Walk handle table looking for our named port.
-            //
-            enumContext.ObjectFullName = objectFullName;
-            enumContext.ObjectHandle = NULL;
-
-            if (supEnumHandleDump(pHandles,
-                supxEnumAlpcPortsCallback,
-                &enumContext))
-            {
-                if (enumContext.ObjectHandle) {
+                if (NT_SUCCESS(ntStatus)) {
 
                     //
                     // Save handle as reference.
                     //
-                    Context->PortObjectInfo.ReferenceHandle = enumContext.ObjectHandle;
+                    Context->PortObjectInfo.ReferenceHandle = refHandle;
                     Context->PortObjectInfo.IsAllocated = TRUE;
-
-                    //
-                    // Duplicate copy with requested desired access.
-                    //
-                    ntStatus = NtDuplicateObject(NtCurrentProcess(),
-                        Context->PortObjectInfo.ReferenceHandle,
-                        NtCurrentProcess(),
-                        ObjectHandle,
-                        DesiredAccess,
-                        0,
-                        0);
-
                 }
-                else {
-                    ntStatus = STATUS_INVALID_HANDLE;
-                }
-
+                
+                if (objectFullName)
+                    supHeapFree(objectFullName);
+            }
+            else {
+                ntStatus = STATUS_INSUFFICIENT_RESOURCES;
             }
 
-        } while (FALSE);
-
-        if (pHandles)
-            supHeapFree(pHandles);
+        } while (FALSE);  
 
     }
 
@@ -4375,7 +4478,7 @@ HANDLE supOpenObjectFromContext(
 )
 {
     HANDLE hObject = NULL, hPrivateNamespace = NULL;
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
     IO_STATUS_BLOCK iost;
     OBJECT_ATTRIBUTES objaNamespace;
 
@@ -4386,14 +4489,14 @@ HANDLE supOpenObjectFromContext(
         //
         InitializeObjectAttributes(&objaNamespace, NULL, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
-        status = NtOpenPrivateNamespace(
+        ntStatus = NtOpenPrivateNamespace(
             &hPrivateNamespace,
             MAXIMUM_ALLOWED,
             &objaNamespace,
             Context->NamespaceInfo.BoundaryDescriptor);
 
-        if (!NT_SUCCESS(status)) {
-            *Status = status;
+        if (!NT_SUCCESS(ntStatus)) {
+            *Status = ntStatus;
             return NULL;
         }
 
@@ -4408,110 +4511,110 @@ HANDLE supOpenObjectFromContext(
     case ObjectTypeProcess:
         if (Context->ContextType == propUnnamed) {
 
-            status = supOpenProcessEx(
+            ntStatus = supOpenProcessEx(
                 Context->UnnamedObjectInfo.ClientId.UniqueProcess,
                 PROCESS_ALL_ACCESS,
                 &hObject);
 
         }
         else
-            status = STATUS_INVALID_PARAMETER;
+            ntStatus = STATUS_INVALID_PARAMETER;
 
         break;
 
     case ObjectTypeThread:
         if (Context->ContextType == propUnnamed) {
-            status = NtOpenThread(&hObject, DesiredAccess,
+            ntStatus = NtOpenThread(&hObject, DesiredAccess,
                 ObjectAttributes,
                 &Context->UnnamedObjectInfo.ClientId);
         }
         else
-            status = STATUS_INVALID_PARAMETER;
+            ntStatus = STATUS_INVALID_PARAMETER;
         break;
 
     case ObjectTypeToken:
         if (Context->ContextType == propUnnamed) {
-            status = supOpenTokenByParam(&Context->UnnamedObjectInfo.ClientId,
+            ntStatus = supOpenTokenByParam(&Context->UnnamedObjectInfo.ClientId,
                 ObjectAttributes,
                 DesiredAccess,
                 Context->UnnamedObjectInfo.IsThreadToken,
                 &hObject);
         }
         else
-            status = STATUS_INVALID_PARAMETER;
+            ntStatus = STATUS_INVALID_PARAMETER;
         break;
 
     case ObjectTypeDevice: //FILE_OBJECT
-        status = NtCreateFile(&hObject, DesiredAccess, ObjectAttributes, &iost, NULL, 0,
+        ntStatus = NtCreateFile(&hObject, DesiredAccess, ObjectAttributes, &iost, NULL, 0,
             FILE_SHARE_VALID_FLAGS, FILE_OPEN, 0, NULL, 0);//generic access rights
         break;
 
     case ObjectTypeMutant:
-        status = NtOpenMutant(&hObject, DesiredAccess, ObjectAttributes); //MUTANT_QUERY_STATE for query
+        ntStatus = NtOpenMutant(&hObject, DesiredAccess, ObjectAttributes); //MUTANT_QUERY_STATE for query
         break;
 
     case ObjectTypeKey:
-        status = NtOpenKey(&hObject, DesiredAccess, ObjectAttributes); //KEY_QUERY_VALUE for query
+        ntStatus = NtOpenKey(&hObject, DesiredAccess, ObjectAttributes); //KEY_QUERY_VALUE for query
         break;
 
     case ObjectTypeSemaphore:
-        status = NtOpenSemaphore(&hObject, DesiredAccess, ObjectAttributes); //SEMAPHORE_QUERY_STATE for query
+        ntStatus = NtOpenSemaphore(&hObject, DesiredAccess, ObjectAttributes); //SEMAPHORE_QUERY_STATE for query
         break;
 
     case ObjectTypeTimer:
-        status = NtOpenTimer(&hObject, DesiredAccess, ObjectAttributes); //TIMER_QUERY_STATE for query
+        ntStatus = NtOpenTimer(&hObject, DesiredAccess, ObjectAttributes); //TIMER_QUERY_STATE for query
         break;
 
     case ObjectTypeEvent:
-        status = NtOpenEvent(&hObject, DesiredAccess, ObjectAttributes); //EVENT_QUERY_STATE for query
+        ntStatus = NtOpenEvent(&hObject, DesiredAccess, ObjectAttributes); //EVENT_QUERY_STATE for query
         break;
 
     case ObjectTypeEventPair:
-        status = NtOpenEventPair(&hObject, DesiredAccess, ObjectAttributes); //generic access
+        ntStatus = NtOpenEventPair(&hObject, DesiredAccess, ObjectAttributes); //generic access
         break;
 
     case ObjectTypeSymbolicLink:
-        status = NtOpenSymbolicLinkObject(&hObject, DesiredAccess, ObjectAttributes); //SYMBOLIC_LINK_QUERY for query
+        ntStatus = NtOpenSymbolicLinkObject(&hObject, DesiredAccess, ObjectAttributes); //SYMBOLIC_LINK_QUERY for query
         break;
 
     case ObjectTypeIoCompletion:
-        status = NtOpenIoCompletion(&hObject, DesiredAccess, ObjectAttributes); //IO_COMPLETION_QUERY_STATE for query
+        ntStatus = NtOpenIoCompletion(&hObject, DesiredAccess, ObjectAttributes); //IO_COMPLETION_QUERY_STATE for query
         break;
 
     case ObjectTypeSection:
-        status = NtOpenSection(&hObject, DesiredAccess, ObjectAttributes); //SECTION_QUERY for query
+        ntStatus = NtOpenSection(&hObject, DesiredAccess, ObjectAttributes); //SECTION_QUERY for query
         break;
 
     case ObjectTypeJob:
-        status = NtOpenJobObject(&hObject, DesiredAccess, ObjectAttributes); //JOB_OBJECT_QUERY for query
+        ntStatus = NtOpenJobObject(&hObject, DesiredAccess, ObjectAttributes); //JOB_OBJECT_QUERY for query
         break;
 
     case ObjectTypeSession:
-        status = NtOpenSession(&hObject, DesiredAccess, ObjectAttributes); //generic access
+        ntStatus = NtOpenSession(&hObject, DesiredAccess, ObjectAttributes); //generic access
         break;
 
     case ObjectTypeMemoryPartition:
         if (g_ExtApiSet.NtOpenPartition) {
-            status = g_ExtApiSet.NtOpenPartition(&hObject, DesiredAccess, ObjectAttributes); //MEMORY_PARTITION_QUERY_ACCESS for query 
+            ntStatus = g_ExtApiSet.NtOpenPartition(&hObject, DesiredAccess, ObjectAttributes); //MEMORY_PARTITION_QUERY_ACCESS for query 
         }
         else
-            status = STATUS_PROCEDURE_NOT_FOUND;
+            ntStatus = STATUS_PROCEDURE_NOT_FOUND;
         break;
 
     case ObjectTypePort:
 
-        status = supOpenPortObjectFromContext(&hObject, 
+        ntStatus = supOpenPortObjectFromContext(&hObject,
             Context, 
             DesiredAccess); //variable access
 
         break;
     
     default:
-        status = STATUS_OBJECTID_NOT_FOUND;
+        ntStatus = STATUS_OBJECTID_NOT_FOUND;
         break;
     }
 
-    *Status = status;
+    *Status = ntStatus;
 
     if (hPrivateNamespace) NtClose(hPrivateNamespace);
 
@@ -6601,50 +6704,133 @@ VOID supJumpToFileListView(
 }
 
 /*
-* supRegisterAlpcPortDummy
+* supQueryAlpcPortObjectTypeIndex
 *
 * Purpose:
 *
-* Create WinObjEx ALPC port for object type reference.
+* Create dummy WinObjEx ALPC port, remember it object type index and destroy port.
 *
 */
-VOID supRegisterAlpcPortDummy(
-    VOID
+VOID supQueryAlpcPortObjectTypeIndex(
+    _In_ PVOID PortGlobal
 )
 {
+    PWINOBJ_PORT_GLOBAL portGlobal = (PWINOBJ_PORT_GLOBAL)PortGlobal;
     NTSTATUS ntStatus;
     HANDLE portHandle = NULL;
     UNICODE_STRING portName = RTL_CONSTANT_STRING(L"\\Rpc Control\\WinObjExPort");
     OBJECT_ATTRIBUTES objectAttributes;
     PSYSTEM_HANDLE_INFORMATION_EX pHandles = NULL;
 
+    ULONG sdLength;
+    SID_IDENTIFIER_AUTHORITY WorldSidAuthority = SECURITY_WORLD_SID_AUTHORITY;
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+    PSID SeWorldSid = NULL;
+    PSID SeRestrictedSid = NULL;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+    PACL pDacl = NULL;
 
-    InitializeObjectAttributes(&objectAttributes, &portName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    do {
 
-    ntStatus = NtCreatePort(&portHandle,
-        &objectAttributes,
-        0,
-        sizeof(PORT_MESSAGE),
-        0);
+        SeWorldSid = supHeapAlloc(RtlLengthRequiredSid(1));
+        if (SeWorldSid == NULL)
+            break;
 
-    if (NT_SUCCESS(ntStatus)) {
+        RtlInitializeSid(SeWorldSid, &WorldSidAuthority, 1);
+        *(RtlSubAuthoritySid(SeWorldSid, 0)) = SECURITY_WORLD_RID;
 
-        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation,
-            NULL);
-        if (pHandles) {
+        ntStatus = RtlAllocateAndInitializeSid(&NtAuthority,
+            1,
+            SECURITY_RESTRICTED_CODE_RID,
+            0, 0, 0, 0, 0, 0, 0,
+            &SeRestrictedSid);
 
-            //
-            // Query ALPC port object type.
-            //
-            if (supQueryObjectFromHandleEx(pHandles,
-                portHandle,
-                NULL,
-                &g_WinObj.AlpcPortTypeInfo.AlpcPortTypeIndex))
-            {
-                g_WinObj.AlpcPortTypeInfo.Initialized = TRUE;
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        sdLength = SECURITY_DESCRIPTOR_MIN_LENGTH +
+            (ULONG)sizeof(ACL) +
+            2 * (ULONG)sizeof(ACCESS_ALLOWED_ACE) +
+            RtlLengthSid(SeWorldSid) +
+            RtlLengthSid(SeRestrictedSid) +
+            8;
+
+        pSD = supHeapAlloc(sdLength);
+        if (pSD == NULL)
+            break;
+
+        pDacl = (PACL)((PCHAR)pSD + SECURITY_DESCRIPTOR_MIN_LENGTH);
+
+        ntStatus = RtlCreateSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION);
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        ntStatus = RtlCreateAcl(pDacl, sdLength - SECURITY_DESCRIPTOR_MIN_LENGTH, ACL_REVISION2);
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        ntStatus = RtlAddAccessAllowedAce(pDacl,
+            ACL_REVISION2,
+            PORT_ALL_ACCESS,
+            SeWorldSid);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        ntStatus = RtlAddAccessAllowedAce(pDacl,
+            ACL_REVISION2,
+            PORT_ALL_ACCESS,
+            SeRestrictedSid);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        ntStatus = RtlSetDaclSecurityDescriptor(pSD,
+            TRUE,
+            pDacl,
+            FALSE);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        InitializeObjectAttributes(&objectAttributes, &portName, OBJ_CASE_INSENSITIVE, NULL, pSD);
+
+        ntStatus = NtCreatePort(&portHandle,
+            &objectAttributes,
+            0,
+            sizeof(PORT_MESSAGE),
+            0);
+
+        if (NT_SUCCESS(ntStatus)) {
+
+            pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation,
+                NULL);
+            if (pHandles) {
+
+                //
+                // Query ALPC port object type.
+                //
+                if (supQueryObjectFromHandleEx(pHandles,
+                    portHandle,
+                    NULL,
+                    &portGlobal->AlpcPortTypeIndex))
+                {
+                    portGlobal->Initialized = TRUE;
+                }
+
+                supHeapFree(pHandles);
             }
 
-            supHeapFree(pHandles);
+            //
+            // Destroy port object.
+            //
+            NtClose(portHandle);
         }
-    }
+
+    } while (FALSE);
+
+    if (SeWorldSid) supHeapFree(SeWorldSid);
+    if (SeRestrictedSid) RtlFreeSid(SeRestrictedSid);
+    if (pSD) supHeapFree(pSD);
+
 }

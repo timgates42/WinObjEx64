@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        27 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -443,7 +443,7 @@ VOID UsdDumpSharedRegion(
                     _strcpy(szValue, TEXT("BitPos: "));
                     ultostr(i, _strend(szValue));
                     subitems.Text[0] = szValue;
-                    subitems.Text[1] = (LPTSTR)T_SharedDataFlags[i];
+                    subitems.Text[1] = (LPWSTR)T_SharedDataFlags[i];
                     subitems.Count = 2;
                     h_tviLast = supTreeListAddItem(
                         UsdTreeList,

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        27 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -483,6 +483,7 @@ HTREEITEM AddProcessEntryTreeList(
     subitems.UserParam = (PVOID)objectEntry;
     subitems.Count = 2;
     subitems.Text[0] = szEPROCESS;
+    subitems.Text[1] = T_EmptyString;
 
     //
     // Colors (set order is sensitive).

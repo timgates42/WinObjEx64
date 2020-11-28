@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        27 Nov 2020
 *
 *  Common header file for the program support routines.
 *
@@ -63,6 +63,11 @@ typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
     HANDLE hThread;
     PVOID EntryPtr;
 } OBEX_THREAD_LOOKUP_ENTRY, *POBEX_THREAD_LOOKUP_ENTRY;
+
+typedef struct _ALPCPORT_ENUM_CONTEXT {
+    _In_ LPCWSTR ObjectFullName;
+    _Out_ HANDLE ObjectHandle;
+} ALPCPORT_ENUM_CONTEXT, * PALPCPORT_ENUM_CONTEXT;
 
 // return true to stop enumeration
 typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
@@ -666,10 +671,21 @@ VOID supJumpToFileListView(
     _In_ HWND hwndList,
     _In_ INT iFileNameColumn);
 
-VOID supRegisterAlpcPortDummy(
-    VOID);
+VOID supQueryAlpcPortObjectTypeIndex(
+    _In_ PVOID PortGlobal);
 
 BOOL supEnumHandleDump(
     _In_ PSYSTEM_HANDLE_INFORMATION_EX HandleDump,
     _In_ PENUMERATE_HANDLE_DUMP_CALLBACK EnumCallback,
     _In_ PVOID UserContext);
+
+NTSTATUS supOpenPortObjectByName(
+    _Out_ PHANDLE ObjectHandle,
+    _Out_opt_ PHANDLE ReferenceHandle,
+    _In_ LPCWSTR ObjectName,
+    _In_ ACCESS_MASK DesiredAccess);
+
+NTSTATUS supOpenPortObjectFromContext(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ PROP_OBJECT_INFO* Context,
+    _In_ ACCESS_MASK DesiredAccess);
