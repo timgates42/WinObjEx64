@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        17 July 2020
+*  DATE:        28 Nov 2020
 *
 *  Plugin manager.
 *
@@ -1009,40 +1009,28 @@ VOID PmpListSupportedObjectTypes(
 }
 
 /*
-* PmpHandleNotify
+* PmpShowPluginInfo
 *
 * Purpose:
 *
-* Plugin Manager dialog WM_NOTIFY handler.
+* Show selected plugin information.
 *
 */
-VOID PmpHandleNotify(
+VOID PmpShowPluginInfo(
     _In_ HWND hwndDlg,
-    _In_ LPARAM lParam
+    _In_ HWND hwndListView,
+    _In_ INT itemIndex
 )
 {
     PWINOBJEX_PLUGIN_INTERNAL PluginData = NULL;
     LPWSTR lpType;
-    LPNMLISTVIEW pListView = (LPNMLISTVIEW)lParam;
     HWND hwndCB;
     INT nCount;
 
     WCHAR szModuleName[MAX_PATH + 1];
 
-    if (pListView->hdr.idFrom != IDC_PLUGINLIST)
-        return;
-
-#pragma warning(push)
-#pragma warning(disable: 26454)
-    if ((pListView->hdr.code != NM_CLICK) &&
-        (pListView->hdr.code != LVN_ITEMCHANGED))
-    {
-        return;
-    }
-#pragma warning(pop)
-
-    if (!supGetListViewItemParam(pListView->hdr.hwndFrom,
-        pListView->iItem,
+    if (!supGetListViewItemParam(hwndListView,
+        itemIndex,
         (PVOID*)&PluginData))
     {
         return;
@@ -1092,6 +1080,53 @@ VOID PmpHandleNotify(
     RtlSecureZeroMemory(szModuleName, sizeof(szModuleName));
     GetModuleFileName(PluginData->Module, (LPWSTR)&szModuleName, MAX_PATH);
     SetWindowText(GetDlgItem(hwndDlg, IDC_PLUGIN_FILENAME), szModuleName);
+}
+
+/*
+* PmpHandleNotify
+*
+* Purpose:
+*
+* Plugin Manager dialog WM_NOTIFY handler.
+*
+*/
+VOID PmpHandleNotify(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
+)
+{
+    LPNMLISTVIEW pListView = (LPNMLISTVIEW)lParam;
+
+
+    if (pListView->hdr.idFrom != IDC_PLUGINLIST)
+        return;
+
+    switch (pListView->hdr.code) {
+
+    case NM_CLICK:
+
+        PmpShowPluginInfo(hwndDlg, 
+            pListView->hdr.hwndFrom,
+            pListView->iItem);
+
+        break;
+
+    case LVN_ITEMCHANGED:
+
+        if ((pListView->uNewState & LVIS_SELECTED) &&
+            !(pListView->uOldState & LVIS_SELECTED))
+        {
+            PmpShowPluginInfo(hwndDlg,
+                pListView->hdr.hwndFrom,
+                pListView->iItem);
+        }
+
+        break;
+
+    default:
+        break;
+    }
+
 }
 
 /*

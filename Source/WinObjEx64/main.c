@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        28 Nov 2020
 *
 *  Program entry point and main window handler.
 *
@@ -678,25 +678,30 @@ LRESULT MainWindowHandleWMNotify(
 
             case LVN_ITEMCHANGED:
                 lvn = (LPNMLISTVIEW)lParam;
-                RtlSecureZeroMemory(&szItemString, sizeof(szItemString));
-                ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, szItemString, MAX_PATH);
-                lcp = _strlen(g_WinObj.CurrentObjectPath);
-                if (lcp) {
-                    str = (LPWSTR)supHeapAlloc((lcp + sizeof(szItemString) + 4) * sizeof(WCHAR));
-                    if (str == NULL)
-                        break;
-                    _strcpy(str, g_WinObj.CurrentObjectPath);
+                if ((lvn->uNewState & LVIS_SELECTED) && 
+                    !(lvn->uOldState & LVIS_SELECTED)) 
+                {
+                    RtlSecureZeroMemory(&szItemString, sizeof(szItemString));
+                    ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, szItemString, MAX_PATH);
+                    lcp = _strlen(g_WinObj.CurrentObjectPath);
+                    if (lcp) {
+                        str = (LPWSTR)supHeapAlloc((lcp + sizeof(szItemString) + 4) * sizeof(WCHAR));
+                        if (str) {
 
-                    if ((str[0] == '\\') && (str[1] == 0)) {
-                        _strcpy(str + lcp, szItemString);
+                            _strcpy(str, g_WinObj.CurrentObjectPath);
+
+                            if ((str[0] == '\\') && (str[1] == 0)) {
+                                _strcpy(str + lcp, szItemString);
+                            }
+                            else {
+                                str[lcp] = '\\';
+                                _strcpy(str + lcp + 1, szItemString);
+                            }
+                            SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
+                            supHeapFree(str);
+                        }
+                        supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
                     }
-                    else {
-                        str[lcp] = '\\';
-                        _strcpy(str + lcp + 1, szItemString);
-                    }
-                    SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
-                    supHeapFree(str);
-                    supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
                 }
                 break;
 
@@ -1534,6 +1539,9 @@ UINT WinObjExMain()
 
         hAccTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
+        //
+        // Init plugin manager.
+        //
         PmCreate(MainWindow);
 
         //
@@ -1587,9 +1595,14 @@ UINT WinObjExMain()
     if (g_TreeListAtom != 0)
         UnregisterClass(MAKEINTATOM(g_TreeListAtom), g_WinObj.hInstance);
 
+    //
+    // Destroy plugin manager.
+    //
     PmDestroy();
 
-    //do not move anywhere
+    //
+    // Do not move anywhere.
+    //
 
     supShutdown();
     logFree();

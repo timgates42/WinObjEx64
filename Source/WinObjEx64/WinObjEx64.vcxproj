@@ -539,6 +539,7 @@
     <Image Include="rsrc\icon1.ico" />
     <Image Include="rsrc\mailslot.ico" />
     <Image Include="rsrc\pipe.ico" />
+    <Image Include="rsrc\security.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

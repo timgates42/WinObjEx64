@@ -683,8 +683,11 @@ LPWSTR PsListGetThreadStateAsString(
 
         _strcpy(StateBuffer, TEXT("Wait:"));
 
-        if (WaitReason >= 0 && WaitReason < MAX_KNOWN_WAITREASON)
+#pragma warning(push)
+#pragma warning (disable: 33010) // No.
+        if (WaitReason < MAX_KNOWN_WAITREASON)
             lpWaitReason = T_WAITREASON[WaitReason];
+#pragma warning(pop)
 
         _strcat(StateBuffer, lpWaitReason);
     }

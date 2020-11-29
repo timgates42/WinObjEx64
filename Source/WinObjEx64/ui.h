@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        28 Nov 2020
 *
 *  Common header file for the user interface.
 *
@@ -215,6 +215,7 @@ typedef struct _PROP_OBJECT_INFO {
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
 #define VALIDATE_PROP_CONTEXT(Context) { if (Context == NULL) return; }
+#define VALIDATE_PROP_CONTEXT_WITH_RESULT(Context, Result) { if (Context == NULL) return Result; }
 
 //
 // If dialog already present - activate it window and return.

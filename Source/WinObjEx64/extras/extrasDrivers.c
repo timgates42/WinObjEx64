@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        19 Oct 2020
+*  DATE:        28 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -412,7 +412,7 @@ VOID DrvListDrivers(
 *
 */
 BOOL CALLBACK DriversHandleNotify(
-    _In_ LPNMLISTVIEW nhdr,
+    _In_ LPNMLISTVIEW NMListView,
     _In_ EXTRASCONTEXT* Context,
     _In_opt_ PVOID CustomParameter
 )
@@ -421,19 +421,29 @@ BOOL CALLBACK DriversHandleNotify(
 
     UNREFERENCED_PARAMETER(CustomParameter);
 
-    if ((nhdr == NULL) || (Context == NULL))
+    VALIDATE_PROP_CONTEXT_WITH_RESULT(Context, FALSE);
+
+    if (NMListView->hdr.idFrom != ID_EXTRASLIST)
         return FALSE;
 
-    if (nhdr->hdr.idFrom != ID_EXTRASLIST)
-        return FALSE;
+    switch (NMListView->hdr.code) {
 
-    switch (nhdr->hdr.code) {
     case NM_DBLCLK:
         DrvListViewProperties();
         break;
-    case NM_CLICK:       
+
+    case NM_CLICK:
+        DrvUpdateStatusBar(NMListView->iItem);
+        break;
+
     case LVN_ITEMCHANGED:
-        DrvUpdateStatusBar(nhdr->iItem);
+
+        if ((NMListView->uNewState & LVIS_SELECTED) && 
+            !(NMListView->uOldState & LVIS_SELECTED))
+        {
+            DrvUpdateStatusBar(NMListView->iItem);
+        }
+
         break;
     default:
         bHandled = FALSE;

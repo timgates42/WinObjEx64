@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.157
+*  VERSION:     1.158
 *
-*  DATE:        26 Nov 2020
+*  DATE:        28 Nov 2020
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -346,7 +346,7 @@ char _RTL_CONSTANT_STRING_type_check(const void *s);
 //
 // SymbolicLink Object Access Rights
 //
-#define SYMBOLIC_LINK_QUERY (0x0001)
+#define SYMBOLIC_LINK_QUERY 0x0001
 #define SYMBOLIC_LINK_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYMBOLIC_LINK_QUERY)
 
 //
@@ -618,7 +618,7 @@ typedef enum _THREAD_STATE {
 } THREAD_STATE;
 
 typedef enum _KWAIT_REASON {
-    Executive,
+    Executive = 0,
     FreePage,
     PageIn,
     PoolAllocation,

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 July 2020
+*  DATE:        28 Nov 2020
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -292,7 +292,9 @@ VOID IpcPipeQueryInfo(
     hPipe = NULL;
     if (!IpcOpenObjectMethod(Context, &hPipe, GENERIC_READ)) {
 		
-		// for pipes created with PIPE_ACCESS_INBOUND open mode https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+        // for pipes created with PIPE_ACCESS_INBOUND open mode 
+        // https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+        
         if (!IpcOpenObjectMethod(Context, &hPipe, GENERIC_WRITE | FILE_READ_ATTRIBUTES)) {
             IpcDisplayError(hwndDlg, IpcModeNamedPipes);
             return;
@@ -631,11 +633,9 @@ VOID IpcDlgQueryInfo(
                 bRestartScan //RestartScan
             );
 
-            if (
-                (!NT_SUCCESS(status)) ||
+            if ( (!NT_SUCCESS(status)) ||
                 (!NT_SUCCESS(iost.Status)) ||
-                (iost.Information == 0)
-                )
+                (iost.Information == 0) )
             {
                 break;
             }

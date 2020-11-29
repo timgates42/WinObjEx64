@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.88
 *
-*  DATE:        13 Mar 2020
+*  DATE:        28 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -201,31 +201,39 @@ VOID FindDlgResize(
 *
 */
 BOOL FindDlgHandleNotify(
-    _In_ LPNMLISTVIEW nhdr
+    _In_ LPNMLISTVIEW pListView
 )
 {
     INT      nImageIndex;
     LPWSTR   lpItemText;
 
-    if (nhdr->hdr.idFrom != ID_SEARCH_LIST)
+    if (pListView->hdr.idFrom != ID_SEARCH_LIST)
         return FALSE;
 
-    switch (nhdr->hdr.code) {
+    switch (pListView->hdr.code) {
 
     case LVN_ITEMCHANGED:
-        if (!(nhdr->uNewState & LVIS_SELECTED))
-            break;
 
-        lpItemText = supGetItemText(nhdr->hdr.hwndFrom, nhdr->iItem, 0, NULL);
-        if (lpItemText) {
-            ListToObject(lpItemText);
-            supHeapFree(lpItemText);
+        if ((pListView->uNewState & LVIS_SELECTED) &&
+            !(pListView->uOldState & LVIS_SELECTED)) 
+        {
+
+            lpItemText = supGetItemText(pListView->hdr.hwndFrom, 
+                pListView->iItem, 
+                0, 
+                NULL);
+
+            if (lpItemText) {
+                ListToObject(lpItemText);
+                supHeapFree(lpItemText);
+            }
         }
+
         break;
 
     case LVN_COLUMNCLICK:
         bFindDlgSortInverse = !bFindDlgSortInverse;
-        FindDlgSortColumn = ((NMLISTVIEW*)nhdr)->iSubItem;
+        FindDlgSortColumn = pListView->iSubItem;
         ListView_SortItemsEx(FindDlgList, &FindDlgCompareFunc, FindDlgSortColumn);
 
         nImageIndex = ImageList_GetImageCount(g_ListViewImages);

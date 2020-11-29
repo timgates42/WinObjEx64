@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        28 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -314,8 +314,9 @@ BOOL SLCacheDialogHandleNotify(
             break;
 
         case LVN_ITEMCHANGED:
-            if (pListView->uNewState & LVNI_FOCUSED &&
-                pListView->uNewState & LVNI_SELECTED)
+
+            if ((pListView->uNewState & LVIS_SELECTED) &&
+                !(pListView->uOldState & LVIS_SELECTED))
             {
                 SLCacheDialogDisplayDescriptorData(hwndDlg,
                     pListView->hdr.hwndFrom,

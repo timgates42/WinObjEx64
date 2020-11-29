@@ -886,7 +886,7 @@ VOID TestAlpcPortOpen()
         NtClose(hObject);
     }
     else {
-        kdDebugPrint("supOpenPortObjectByName failed with NTSTATUS 0x%ul", (ULONG)ntStatus);
+        kdDebugPrint("supOpenPortObjectByName failed with NTSTATUS 0x%lX", (ULONG)ntStatus);
     }
 }
 

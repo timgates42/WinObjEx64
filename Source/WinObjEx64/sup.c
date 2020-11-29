@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        27 Nov 2020
+*  DATE:        28 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3346,6 +3346,9 @@ BOOL supRunAsLocalSystem(
     OBJECT_ATTRIBUTES obja;
     TOKEN_PRIVILEGES* TokenPrivileges;
 
+    BYTE TokenPrivBufffer[sizeof(TOKEN_PRIVILEGES) +
+        (1 * sizeof(LUID_AND_ATTRIBUTES))];
+
     WCHAR szApplication[MAX_PATH * 2];
 
     //
@@ -3452,9 +3455,7 @@ BOOL supRunAsLocalSystem(
         //
         // Turn on AssignPrimaryToken privilege in impersonated token.
         //
-        TokenPrivileges = (TOKEN_PRIVILEGES*)_alloca(sizeof(TOKEN_PRIVILEGES) +
-            (1 * sizeof(LUID_AND_ATTRIBUTES)));
-
+        TokenPrivileges = (TOKEN_PRIVILEGES*)&TokenPrivBufffer;
         TokenPrivileges->PrivilegeCount = 1;
         TokenPrivileges->Privileges[0].Luid.LowPart = SE_ASSIGNPRIMARYTOKEN_PRIVILEGE;
         TokenPrivileges->Privileges[0].Luid.HighPart = 0;
@@ -4020,8 +4021,7 @@ NTSTATUS supOpenNamedObjectByType(
                     objectFullName,
                     DesiredAccess);
 
-                if (objectFullName)
-                    supHeapFree(objectFullName);
+                supHeapFree(objectFullName);
 
             }
 
@@ -4448,8 +4448,7 @@ NTSTATUS supOpenPortObjectFromContext(
                     Context->PortObjectInfo.IsAllocated = TRUE;
                 }
                 
-                if (objectFullName)
-                    supHeapFree(objectFullName);
+                supHeapFree(objectFullName);
             }
             else {
                 ntStatus = STATUS_INSUFFICIENT_RESOURCES;
