@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        27 Nov 2020
+*  DATE:        29 Nov 2020
 *
 *  Common header file for the program support routines.
 *
@@ -258,6 +258,20 @@ UINT supGetObjectNameIndexByTypeIndex(
 VOID supRunAsAdmin(
     VOID);
 
+BOOL supListViewCopyItemValueToClipboard(
+    _In_ HWND hwndListView,
+    _In_ INT iItem,
+    _In_ INT iSubItem);
+
+BOOL supListViewAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndLv,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ POINT* lpPoint,
+    _Out_ INT* pItemHit,
+    _Out_ INT* pColumnHit);
+
 VOID supSetMenuIcon(
     _In_ HMENU hMenu,
     _In_ UINT Item,
@@ -270,7 +284,7 @@ VOID supSetGotoLinkTargetToolButtonState(
     _In_ BOOL bForce,
     _In_ BOOL bForceEnable);
 
-BOOL supIsSymbolicLinkObject(
+WOBJ_OBJECT_TYPE supObjectListGetObjectType(
     _In_ HWND hwndList,
     _In_ INT iItem);
 
@@ -471,10 +485,6 @@ PSID supQueryProcessSid(
 
 VOID supCopyTreeListSubItemValue(
     _In_ HWND TreeList,
-    _In_ UINT ValueIndex);
-
-VOID supCopyListViewSubItemValue(
-    _In_ HWND ListView,
     _In_ UINT ValueIndex);
 
 VOID supJumpToFile(

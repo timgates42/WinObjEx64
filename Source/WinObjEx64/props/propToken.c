@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        28 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,6 +18,8 @@
 #include "propDlg.h"
 
 HWND g_hwndTokenPageList;
+INT g_lvTokenPageSelectedItem;
+INT g_lvTokenPageColumnHit;
 
 #define T_TOKEN_PROP_CID_PID    TEXT("propTokenPid")
 #define T_TOKEN_PROP_CID_TID    TEXT("propTokenTid")
@@ -66,6 +68,8 @@ VOID TokenPageInitControls(
     LVGROUP lvg;
 
     g_hwndTokenPageList = GetDlgItem(hwndDlg, IDC_TOKEN_PRIVLIST);
+    g_lvTokenPageSelectedItem = -1;
+    g_lvTokenPageColumnHit = -1;
 
     ListView_SetExtendedListViewStyle(g_hwndTokenPageList,
         LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
@@ -527,8 +531,23 @@ VOID TokenPageHandlePopup(
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, TEXT("Copy"));
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwndDlg, NULL);
+
+        if (supListViewAddCopyValueItem(hMenu,
+            g_hwndTokenPageList,
+            ID_OBJECT_COPY,
+            0,
+            point,
+            &g_lvTokenPageSelectedItem,
+            &g_lvTokenPageColumnHit))
+        {
+            TrackPopupMenu(hMenu, 
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN, 
+                point->x, 
+                point->y, 
+                0, 
+                hwndDlg, 
+                NULL);
+        }
         DestroyMenu(hMenu);
     }
 }
@@ -553,7 +572,11 @@ INT_PTR TokenPageDialogOnCommand(
 
     switch (GET_WM_COMMAND_ID(wParam, lParam)) {
     case ID_OBJECT_COPY:
-        supCopyListViewSubItemValue(g_hwndTokenPageList, 0);
+
+        supListViewCopyItemValueToClipboard(g_hwndTokenPageList,
+            g_lvTokenPageSelectedItem,
+            g_lvTokenPageColumnHit);
+        
         Result = 1;
         break;
     case IDC_TOKEN_ADVANCED:

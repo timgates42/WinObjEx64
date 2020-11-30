@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        29 Nov 2020
 *
 *  Common header file for the user interface.
 *
@@ -71,6 +71,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define T_PROPERTIES            L"Properties...\tEnter"
 #define T_GOTOLINKTARGET        L"Go To Link Target\tCtrl+->"
+#define T_VIEWSD                L"View Security Descriptor..."
 #define T_RUNASADMIN            L"R&un as Administrator"
 #define T_RUNASSYSTEM           L"R&un as LocalSystem"
 #define T_COPYTEXTROW           L"Copy Row Selection"

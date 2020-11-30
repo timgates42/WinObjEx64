@@ -72,20 +72,33 @@ VOID DrvHandlePopupMenu(
 {
     POINT pt1;
     HMENU hMenu;
-    UINT iPos = 0;
+    UINT uPos = 0;
 
     if (GetCursorPos(&pt1)) {
         hMenu = CreatePopupMenu();
         if (hMenu) {
-            InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_DRVLIST_PROP, T_PROPERTIES);
-            InsertMenu(hMenu, iPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            if (kdConnectDriver()) {
-                InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_DRVLIST_DUMP, T_DUMPDRIVER);
+
+            if (supListViewAddCopyValueItem(hMenu, 
+                DrvDlgContext.ListView, 
+                ID_OBJECT_COPY, 
+                uPos, 
+                &pt1,
+                &DrvDlgContext.lvItemHit,
+                &DrvDlgContext.lvColumnHit))
+            {
+                uPos++;
+                InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
             }
-            InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
-            InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_DRVLIST_SAVE, T_EXPORTTOFILE);
-            InsertMenu(hMenu, iPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_DRVLIST_REFRESH, T_VIEW_REFRESH);
+
+            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_PROP, T_PROPERTIES);
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            if (kdConnectDriver()) {
+                InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_DUMP, T_DUMPDRIVER);
+            }
+            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
+            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_SAVE, T_EXPORTTOFILE);
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_REFRESH, T_VIEW_REFRESH);
             TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
             DestroyMenu(hMenu);
         }
@@ -504,15 +517,26 @@ INT_PTR CALLBACK DriversDialogProc(
     case WM_COMMAND:
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+        case ID_OBJECT_COPY:
+
+            supListViewCopyItemValueToClipboard(DrvDlgContext.ListView,
+                DrvDlgContext.lvItemHit,
+                DrvDlgContext.lvColumnHit);
+
+            break;
+        
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             break;
+
         case ID_DRVLIST_DUMP:
             DrvDumpDriver();
             break;
+
         case ID_JUMPTOFILE:
             supJumpToFileListView(DrvDlgContext.ListView, 4);
             break;
+
         case ID_DRVLIST_SAVE:
 
             if (supListViewExportToFile(
@@ -527,9 +551,11 @@ INT_PTR CALLBACK DriversDialogProc(
         case ID_DRVLIST_PROP:
             DrvListViewProperties();
             break;
+
         case ID_DRVLIST_REFRESH:
             DrvListDrivers(TRUE);
             break;
+
         default:
             break;
         }
@@ -566,8 +592,12 @@ VOID extrasCreateDriversDialog(
     ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[wobjDriversDlgId]);
 
     RtlSecureZeroMemory(&DrvDlgContext, sizeof(DrvDlgContext));
-    DrvDlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
-        hwndParent, &DriversDialogProc, 0);
+
+    DrvDlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, 
+        MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
+        hwndParent, 
+        &DriversDialogProc, 
+        0);
 
     if (DrvDlgContext.hwndDlg == NULL)
         return;
@@ -583,6 +613,9 @@ VOID extrasCreateDriversDialog(
 
     DrvDlgContext.ListView = GetDlgItem(DrvDlgContext.hwndDlg, ID_EXTRASLIST);
     if (DrvDlgContext.ListView) {
+
+        DrvDlgContext.lvColumnHit = -1;
+        DrvDlgContext.lvItemHit = -1;
 
         //
         // Set listview imagelist, style flags and theme.

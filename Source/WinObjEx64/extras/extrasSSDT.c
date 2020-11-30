@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        22 July 2020
+*  DATE:        29 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -93,22 +93,36 @@ INT CALLBACK SdtDlgCompareFunc(
 *
 */
 VOID SdtHandlePopupMenu(
-    _In_ HWND hwndDlg
+    _In_ EXTRASCONTEXT* Context
 )
 {
     POINT pt1;
     HMENU hMenu;
+    UINT uPos = 0;
 
     if (GetCursorPos(&pt1) == FALSE)
         return;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
-        InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_SDTLIST_SAVE, T_EXPORTTOFILE);
-        InsertMenu(hMenu, 2, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-        InsertMenu(hMenu, 3, MF_BYCOMMAND, ID_VIEW_REFRESH, T_RESCAN);
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->ListView,
+            ID_OBJECT_COPY,
+            uPos,
+            &pt1,
+            &Context->lvItemHit,
+            &Context->lvColumnHit))
+        {
+            uPos++;
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        }
+
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_SDTLIST_SAVE, T_EXPORTTOFILE);
+        InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_RESCAN);
+        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, Context->hwndDlg, NULL);
         DestroyMenu(hMenu);
     }
 }
@@ -310,6 +324,16 @@ INT_PTR CALLBACK SdtDialogProc(
                 supJumpToFileListView(pDlgContext->ListView, 3);
             }
             break;
+
+        case ID_OBJECT_COPY:
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+            if (pDlgContext) {
+                supListViewCopyItemValueToClipboard(pDlgContext->ListView,
+                    pDlgContext->lvItemHit,
+                    pDlgContext->lvColumnHit);
+            }
+            break;
+
         }
 
         break;
@@ -319,7 +343,10 @@ INT_PTR CALLBACK SdtDialogProc(
         break;
 
     case WM_CONTEXTMENU:
-        SdtHandlePopupMenu(hwndDlg);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            SdtHandlePopupMenu(pDlgContext);
+        }
         break;
 
     default:
@@ -1658,6 +1685,8 @@ VOID extrasCreateSSDTDialog(
 
     pDlgContext = &SSTDlgContext[Mode];
     pDlgContext->DialogMode = Mode;
+    pDlgContext->lvColumnHit = -1;
+    pDlgContext->lvItemHit = -1;
 
     hwndDlg = CreateDialogParam(
         g_WinObj.hInstance,

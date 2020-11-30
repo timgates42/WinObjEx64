@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.85
+*  VERSION:     1.88
 *
-*  DATE:        13 Mar 2020
+*  DATE:        29 Nov 2020
 *
 *  Common header file for Extras dialogs.
 *
@@ -24,8 +24,10 @@ typedef struct _EXTRASCONTEXT {
     HWND TreeList;
     HWND StatusBar;
     HIMAGELIST ImageList;
-    LONG lvColumnToSort;
-    LONG lvColumnCount;
+    INT lvColumnToSort;
+    INT lvColumnCount;
+    INT lvColumnHit;
+    INT lvItemHit;
     BOOL bInverseSort;
     union {
         ULONG_PTR Reserved;

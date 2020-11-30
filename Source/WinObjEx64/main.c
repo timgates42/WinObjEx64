@@ -344,6 +344,13 @@ LRESULT MainWindowHandleWMCommand(
         }
         break;
 
+    case ID_VIEW_SECURITYDESCRIPTOR:
+        //
+        // TODO: FIXME
+        //
+        MessageBox(0, L"Test", L"", 0);
+        break;
+
     case ID_FIND_FINDOBJECT:
         FindDlgCreate(hwnd);
         break;
@@ -514,6 +521,40 @@ VOID MainWindowTreeViewSelChanged(
 }
 
 /*
+* MainWindowPopupMenuInsertViewSD
+*
+* Purpose:
+*
+* Add "View Security Descriptor" menu item to the popup menu.
+*
+*/
+VOID MainWindowPopupMenuInsertViewSD(
+    _In_ HMENU hMenu,
+    _In_ UINT uPosition
+)
+{
+    HICON hIcon;
+
+    InsertMenu(hMenu, uPosition, MF_BYCOMMAND, ID_VIEW_SECURITYDESCRIPTOR, T_VIEWSD);
+
+    hIcon = (HICON)LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDI_ICON_SECURITY),
+        IMAGE_ICON,
+        0,
+        0,
+        LR_SHARED);
+
+    if (hIcon) {
+
+        supSetMenuIcon(hMenu,
+            ID_VIEW_SECURITYDESCRIPTOR,
+            (ULONG_PTR)hIcon);
+
+        DestroyIcon(hIcon);
+    }
+}
+
+/*
 * MainWindowHandleTreePopupMenu
 *
 * Purpose:
@@ -534,6 +575,8 @@ VOID MainWindowHandleTreePopupMenu(
 
         supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
             (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+
+        MainWindowPopupMenuInsertViewSD(hMenu, 1);
 
         PmBuildPluginPopupMenuByObjectType(hMenu, ObjectTypeDirectory);
 
@@ -557,41 +600,74 @@ VOID MainWindowHandleObjectPopupMenu(
     _In_ LPPOINT point
 )
 {
-    HMENU   hMenu;
-    UINT    uEnable = MF_BYCOMMAND | MF_GRAYED;
-    LVITEM  lvItem;
+    HMENU hMenu;
+    UINT  uGotoSymLinkEnable = MF_BYCOMMAND | MF_GRAYED, uPosition = 0;
+
+    WOBJ_OBJECT_TYPE objType;
 
     hMenu = CreatePopupMenu();
     if (hMenu == NULL) return;
 
-    InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+    InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
 
     supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
         (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
-    if (supIsSymbolicLinkObject(hwndlv, iItem)) {
+    objType = supObjectListGetObjectType(hwndlv, iItem);
 
-        InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_OBJECT_GOTOLINKTARGET, T_GOTOLINKTARGET);
+    switch (objType) {
+
+        //
+        // Insert "Go To Link Target"
+        //
+    case ObjectTypeSymbolicLink:
+
+        InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_GOTOLINKTARGET, T_GOTOLINKTARGET);
 
         supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
             (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance,
                 g_ListViewImages,
                 g_TypeSymbolicLink.ImageIndex));
 
-        uEnable = MF_BYCOMMAND;
-    }
-    EnableMenuItem(GetSubMenu(GetMenu(hwnd), IDMM_OBJECT), ID_OBJECT_GOTOLINKTARGET, uEnable);
+        uGotoSymLinkEnable = MF_BYCOMMAND;
 
-    lvItem.mask = LVIF_PARAM;
-    lvItem.iItem = iItem;
-    lvItem.iSubItem = 0;
-    lvItem.lParam = 0;
+        //
+        // Intentionally do not 'break' here.
+        //
 
-    if (ListView_GetItem(hwndlv, &lvItem)) {
-        PmBuildPluginPopupMenuByObjectType(
-            hMenu,
-            (UCHAR)lvItem.lParam);
+    case ObjectTypeDevice:
+    case ObjectTypeSection:
+    case ObjectTypePort:
+    case ObjectTypeKey:
+    case ObjectTypeEvent:
+    case ObjectTypeJob:
+    case ObjectTypeMutant:
+    case ObjectTypeDirectory:
+    case ObjectTypeWinstation:
+    case ObjectTypeSemaphore:
+    case ObjectTypeTimer:
+    case ObjectTypeSession:
+    case ObjectTypeDesktop:
+    case ObjectTypeWMIGuid:
+    case ObjectTypeIoCompletion:
+    case ObjectTypeTmTx:
+    case ObjectTypeTmTm:
+    case ObjectTypeTmRm:
+    case ObjectTypeTmEn:
+    case ObjectTypeMemoryPartition:
+
+        MainWindowPopupMenuInsertViewSD(hMenu, uPosition);
+        break;
+
+    default:
+        break;
     }
+
+    EnableMenuItem(GetSubMenu(GetMenu(hwnd), IDMM_OBJECT), ID_OBJECT_GOTOLINKTARGET, uGotoSymLinkEnable);
+
+    PmBuildPluginPopupMenuByObjectType(
+        hMenu,
+        (UCHAR)objType);
 
     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
     DestroyMenu(hMenu);

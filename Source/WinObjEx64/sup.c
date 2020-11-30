@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        29 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1234,14 +1234,14 @@ BOOL supUserIsFullAdmin(
 }
 
 /*
-* supIsSymbolicLinkObject
+* supObjectListGetObjectType
 *
 * Purpose:
 *
-* Tests if the current item type is Symbolic link.
+* Return object type of given listview entry.
 *
 */
-BOOL supIsSymbolicLinkObject(
+WOBJ_OBJECT_TYPE supObjectListGetObjectType(
     _In_ HWND hwndList,
     _In_ INT iItem
 )
@@ -1254,7 +1254,7 @@ BOOL supIsSymbolicLinkObject(
     lvItem.lParam = 0;
     ListView_GetItem(hwndList, &lvItem);
 
-    return (lvItem.lParam == g_TypeSymbolicLink.Index);
+    return (WOBJ_OBJECT_TYPE)lvItem.lParam;
 }
 
 /*
@@ -1281,12 +1281,100 @@ VOID supSetGotoLinkTargetToolButtonState(
     }
     else {
         if (hwndlv) {
-            if (supIsSymbolicLinkObject(hwndlv, iItem)) {
+            if (ObjectTypeSymbolicLink == supObjectListGetObjectType(hwndlv, iItem)) {
                 uEnable = MF_BYCOMMAND;
             }
         }
     }
     EnableMenuItem(GetSubMenu(GetMenu(hwnd), IDMM_OBJECT), ID_OBJECT_GOTOLINKTARGET, uEnable);
+}
+
+/*
+* supListViewAddCopyValueItem
+*
+* Purpose:
+*
+* Add copy to clipboard menu item depending on hit column.
+*
+*/
+BOOL supListViewAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndLv,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ POINT* lpPoint,
+    _Out_ INT* pItemHit,
+    _Out_ INT* pColumnHit
+)
+{
+    LVHITTESTINFO lvht;
+    LVCOLUMN lvc;
+    WCHAR szItem[MAX_PATH * 2];
+    WCHAR szColumn[MAX_PATH + 1];
+
+    *pColumnHit = -1;
+    *pItemHit = -1;
+
+    RtlSecureZeroMemory(&lvht, sizeof(lvht));
+    lvht.pt.x = lpPoint->x;
+    lvht.pt.y = lpPoint->y;
+    ScreenToClient(hwndLv, &lvht.pt);
+    if (ListView_SubItemHitTest(hwndLv, &lvht) == -1)
+        return FALSE;
+
+    RtlSecureZeroMemory(&lvc, sizeof(lvc));
+    RtlSecureZeroMemory(&szColumn, sizeof(szColumn));
+
+    lvc.mask = LVCF_TEXT;
+    lvc.pszText = szColumn;
+    lvc.cchTextMax = MAX_PATH;
+    if (ListView_GetColumn(hwndLv, lvht.iSubItem, &lvc)) {
+        _strcpy(szItem, TEXT("Copy \""));
+        _strcat(szItem, szColumn);
+        _strcat(szItem, TEXT("\""));
+        if (InsertMenu(hMenu, uPos, MF_BYCOMMAND, uId, szItem)) {
+            *pColumnHit = lvht.iSubItem;
+            *pItemHit = lvht.iItem;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+/*
+* supListViewCopyItemValueToClipboard
+*
+* Purpose:
+*
+* Add copy to clipboard menu item depending on hit column.
+*
+*/
+BOOL supListViewCopyItemValueToClipboard(
+    _In_ HWND hwndListView,
+    _In_ INT iItem,
+    _In_ INT iSubItem
+)
+{
+    SIZE_T cbText;
+    LPWSTR lpText;
+
+    if ((iSubItem < 0) || (iItem < 0))
+        return FALSE;
+
+    lpText = supGetItemText(hwndListView,
+        iItem,
+        iSubItem, 
+        NULL);
+    
+    if (lpText) {
+        cbText = _strlen(lpText) * sizeof(WCHAR);
+        supClipboardCopy(lpText, cbText);
+        supHeapFree(lpText);
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 /*
@@ -4761,33 +4849,6 @@ VOID supCopyTreeListSubItemValue(
     }
     __except (WOBJ_EXCEPTION_FILTER) {
         return;
-    }
-}
-
-/*
-* supCopyListViewSubItemValue
-*
-* Purpose:
-*
-* Copy listview value to the clipboard.
-*
-*/
-VOID supCopyListViewSubItemValue(
-    _In_ HWND ListView,
-    _In_ UINT ValueIndex
-)
-{
-    INT mark;
-    SIZE_T cbText;
-    LPWSTR lpText;
-
-    mark = ListView_GetSelectionMark(ListView);
-
-    lpText = supGetItemText(ListView, mark, ValueIndex, NULL);
-    if (lpText) {
-        cbText = _strlen(lpText) * sizeof(WCHAR);
-        supClipboardCopy(lpText, cbText);
-        supHeapFree(lpText);
     }
 }
 

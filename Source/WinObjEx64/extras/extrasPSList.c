@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        27 Nov 2020
+*  DATE:        29 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -167,16 +167,37 @@ VOID PsListHandlePopupMenu(
     _In_ HWND hwndDlg,
     _In_ LPPOINT point,
     _In_ UINT itemCopy,
-    _In_ UINT itemRefresh
+    _In_ UINT itemRefresh,
+    _In_ BOOL fTreeList
 )
 {
     HMENU hMenu;
+    UINT uPos = 0;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, itemCopy, T_COPYOBJECT);
-        InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-        InsertMenu(hMenu, 2, MF_BYCOMMAND, itemRefresh, T_VIEW_REFRESH);
+
+        if (fTreeList) {
+            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, itemCopy, T_COPYOBJECT);
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        }
+        else {
+
+            if (supListViewAddCopyValueItem(hMenu,
+                PsDlgContext.ListView,
+                itemCopy,
+                uPos,
+                point,
+                &PsDlgContext.lvItemHit,
+                &PsDlgContext.lvColumnHit))
+            {
+                uPos++;
+                InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            }
+
+        }
+
+        InsertMenu(hMenu, uPos, MF_BYCOMMAND, itemRefresh, T_VIEW_REFRESH);
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);
     }
@@ -1342,7 +1363,7 @@ INT_PTR CALLBACK PsListDialogProc(
 
         if ((HWND)wParam == TreeListControl) {
             GetCursorPos((LPPOINT)&crc);
-            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY, ID_VIEW_REFRESH);
+            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY, ID_VIEW_REFRESH, TRUE);
         }
 
         if ((HWND)wParam == PsDlgContext.ListView) {
@@ -1357,7 +1378,7 @@ INT_PTR CALLBACK PsListDialogProc(
             else
                 GetCursorPos((LPPOINT)&crc);
 
-            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY + 1, ID_VIEW_REFRESH + 1);
+            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY + 1, ID_VIEW_REFRESH + 1, FALSE);
         }
 
         break;
@@ -1374,15 +1395,18 @@ INT_PTR CALLBACK PsListDialogProc(
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             return TRUE;
+        
         case ID_OBJECT_COPY:
-        case ID_OBJECT_COPY + 1:
-            if (uCommandId == ID_OBJECT_COPY) {
-                supCopyTreeListSubItemValue(PsDlgContext.TreeList, 0);
-            }
-            else {
-                supCopyListViewSubItemValue(PsDlgContext.ListView, 3);
-            }
+            supCopyTreeListSubItemValue(PsDlgContext.TreeList, 0);
             break;
+
+        case ID_OBJECT_COPY + 1:            
+            supListViewCopyItemValueToClipboard(PsDlgContext.ListView,
+                PsDlgContext.lvItemHit,
+                PsDlgContext.lvColumnHit);
+
+            break;
+
         case ID_VIEW_REFRESH:
         case ID_VIEW_REFRESH + 1:
 
