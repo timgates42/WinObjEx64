@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        29 Nov 2020
+*  DATE:        30 Nov 2020
 *
 *  Common header file for the program support routines.
 *
@@ -69,6 +69,14 @@ typedef struct _ALPCPORT_ENUM_CONTEXT {
     _Out_ HANDLE ObjectHandle;
 } ALPCPORT_ENUM_CONTEXT, * PALPCPORT_ENUM_CONTEXT;
 
+typedef struct _PS_HANDLE_DUMP_ENUM_CONTEXT {
+    _In_ USHORT ObjectTypeIndex;
+    _In_ ULONG_PTR ObjectAddress;
+    _In_ HWND ListView;
+    _In_ HIMAGELIST ImageList;
+    _In_ PVOID ProcessList;
+} PS_HANDLE_DUMP_ENUM_CONTEXT, * PPS_HANDLE_DUMP_ENUM_CONTEXT;
+
 // return true to stop enumeration
 typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
     _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
@@ -80,6 +88,11 @@ typedef BOOL(CALLBACK* PENUMERATE_HANDLE_DUMP_CALLBACK)(
     _In_ SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX *HandleEntry,
     _In_opt_ PVOID UserContext
     );
+
+typedef NTSTATUS(NTAPI *PNTOBJECTOPENPROCEDURE)(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes);
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
@@ -169,6 +182,7 @@ typedef struct tagVERHEAD {
 #define supOpenDirectory ntsupOpenDirectory
 #define supQueryProcessName ntsupQueryProcessName
 #define supQueryProcessEntryById ntsupQueryProcessEntryById
+#define supQueryProcessInformation ntsupQueryProcessInformation
 #define supWriteBufferToFile ntsupWriteBufferToFile
 #define supQueryHVCIState ntsupQueryHVCIState
 #define supLookupImageSectionByName ntsupLookupImageSectionByName
@@ -361,6 +375,11 @@ PVOID supGetTokenInfo(
 PVOID supGetSystemInfo(
     _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
     _Out_opt_ PULONG ReturnLength);
+
+NTSTATUS supOpenDeviceObject(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes);
 
 HANDLE supOpenDirectoryForObject(
     _In_ LPWSTR lpObjectName,
@@ -691,11 +710,15 @@ BOOL supEnumHandleDump(
 
 NTSTATUS supOpenPortObjectByName(
     _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
     _Out_opt_ PHANDLE ReferenceHandle,
-    _In_ LPCWSTR ObjectName,
-    _In_ ACCESS_MASK DesiredAccess);
+    _In_ LPCWSTR ObjectName);
 
 NTSTATUS supOpenPortObjectFromContext(
     _Out_ PHANDLE ObjectHandle,
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ ACCESS_MASK DesiredAccess);
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ PROP_OBJECT_INFO* Context);
+
+NTSTATUS supQueryProcessImageFileNameWin32(
+    _In_ HANDLE UniqueProcessId,
+    _Out_ PUNICODE_STRING* ProcessImageFileName);

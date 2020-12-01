@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        27 Nov 2020
+*  DATE:        29 Nov 2020
 *
 *  Test code used while debug.
 *
@@ -877,9 +877,9 @@ VOID TestAlpcPortOpen()
     NTSTATUS ntStatus;
 
     ntStatus = supOpenPortObjectByName(&hObject, 
+        PORT_ALL_ACCESS,
         NULL, 
-        WOBJEX_TEST_PORT, 
-        PORT_ALL_ACCESS);
+        WOBJEX_TEST_PORT);
 
     if (NT_SUCCESS(ntStatus)) {
         Beep(0, 0);

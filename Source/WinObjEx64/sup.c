@@ -4006,6 +4006,30 @@ NTSTATUS supOpenTokenByParam(
 }
 
 /*
+* supOpenDeviceObject
+*
+* Purpose:
+*
+* Open handle for device object.
+*
+*/
+NTSTATUS supOpenDeviceObject(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes
+)
+{
+    IO_STATUS_BLOCK iost;
+
+    return NtOpenFile(ObjectHandle, 
+        DesiredAccess, 
+        ObjectAttributes, 
+        &iost, 
+        FILE_SHARE_VALID_FLAGS, 
+        0);
+}
+
+/*
 * supOpenNamedObjectByType
 *
 * Purpose:
@@ -4014,10 +4038,11 @@ NTSTATUS supOpenTokenByParam(
 *
 * Supported types are:
 *
-*  Directory (ObjectName parameter then ignored)
+*  Directory (ObjectName parameter then should be NULL)
 *  Device
 *  Mutant
 *  Key
+*  KeyedEvent
 *  Semaphore
 *  Timer
 *  Event
@@ -4039,7 +4064,6 @@ NTSTATUS supOpenNamedObjectByType(
     _In_ ACCESS_MASK DesiredAccess
 )
 {
-    IO_STATUS_BLOCK iost;
     OBJECT_ATTRIBUTES obja;
     UNICODE_STRING ustr;
     HANDLE rootHandle = NULL, objectHandle = NULL;
@@ -4048,6 +4072,8 @@ NTSTATUS supOpenNamedObjectByType(
     LPWSTR objectFullName = NULL;
     SIZE_T cchObjectFullName;
 
+    PNTOBJECTOPENPROCEDURE ObjectOpenProcedure = NULL;
+
     *ObjectHandle = NULL;
 
     if (ObjectDirectory == NULL)
@@ -4055,19 +4081,20 @@ NTSTATUS supOpenNamedObjectByType(
 
     if ((TypeIndex != ObjectTypeDirectory) &&
         (TypeIndex != ObjectTypeDevice) &&
-        (TypeIndex != ObjectTypeMutant) &&
-        (TypeIndex != ObjectTypeKey) &&
-        (TypeIndex != ObjectTypeSemaphore) &&
-        (TypeIndex != ObjectTypeTimer) &&
         (TypeIndex != ObjectTypeEvent) &&
         (TypeIndex != ObjectTypeEventPair) &&
-        (TypeIndex != ObjectTypeSymbolicLink) &&
         (TypeIndex != ObjectTypeIoCompletion) &&
-        (TypeIndex != ObjectTypeSection) &&
         (TypeIndex != ObjectTypeJob) &&
-        (TypeIndex != ObjectTypeSession) &&
+        (TypeIndex != ObjectTypeKey) &&
+        (TypeIndex != ObjectTypeKeyedEvent) &&
+        (TypeIndex != ObjectTypeMutant) &&
         (TypeIndex != ObjectTypeMemoryPartition) &&
-        (TypeIndex != ObjectTypePort))
+        (TypeIndex != ObjectTypePort) &&
+        (TypeIndex != ObjectTypeSemaphore) &&
+        (TypeIndex != ObjectTypeTimer) &&
+        (TypeIndex != ObjectTypeSymbolicLink) &&
+        (TypeIndex != ObjectTypeSection) &&
+        (TypeIndex != ObjectTypeSession))
     {
         return STATUS_INVALID_PARAMETER_2;
     }
@@ -4105,15 +4132,23 @@ NTSTATUS supOpenNamedObjectByType(
                 // Open port by name.
                 //
                 ntStatus = supOpenPortObjectByName(ObjectHandle,
+                    DesiredAccess,
                     NULL,
-                    objectFullName,
-                    DesiredAccess);
+                    objectFullName);
 
                 supHeapFree(objectFullName);
 
             }
 
             return ntStatus;
+        }
+
+        //
+        // Open object directory.
+        //
+        if (TypeIndex == ObjectTypeDirectory) {
+            if (ObjectName != NULL) // Invalid parameters mix.
+                return STATUS_INVALID_PARAMETER_4;
         }
 
         RtlInitUnicodeString(&ustr, ObjectDirectory);
@@ -4124,6 +4159,9 @@ NTSTATUS supOpenNamedObjectByType(
         if (!NT_SUCCESS(ntStatus))
             return ntStatus;
 
+        //
+        // Directory open request, return handle.
+        //
         if (ObjectName == NULL) {
             *ObjectHandle = rootHandle;
             return ntStatus;
@@ -4132,70 +4170,84 @@ NTSTATUS supOpenNamedObjectByType(
         RtlInitUnicodeString(&ustr, ObjectName);
         obja.RootDirectory = rootHandle;
 
+        //
+        // Select open object procedure.
+        //
         switch (TypeIndex) {
         case ObjectTypeDevice:
-            ntStatus = NtCreateFile(&objectHandle, DesiredAccess, &obja, &iost, NULL, 0,
-                FILE_SHARE_VALID_FLAGS, FILE_OPEN, 0, NULL, 0);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)supOpenDeviceObject;
             break;
 
         case ObjectTypeMutant:
-            ntStatus = NtOpenMutant(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenMutant;
             break;
 
         case ObjectTypeKey:
-            ntStatus = NtOpenKey(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenKey;
             break;
 
         case ObjectTypeSemaphore:
-            ntStatus = NtOpenSemaphore(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenSemaphore;
             break;
 
         case ObjectTypeTimer:
-            ntStatus = NtOpenTimer(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenTimer;
             break;
 
         case ObjectTypeEvent:
-            ntStatus = NtOpenEvent(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenEvent;
             break;
 
         case ObjectTypeEventPair:
-            ntStatus = NtOpenEventPair(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenEventPair;
+            break;
+
+        case ObjectTypeKeyedEvent:
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenKeyedEvent;
             break;
 
         case ObjectTypeSymbolicLink:
-            ntStatus = NtOpenSymbolicLinkObject(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenSymbolicLinkObject;
             break;
 
         case ObjectTypeIoCompletion:
-            ntStatus = NtOpenIoCompletion(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenIoCompletion;
             break;
 
         case ObjectTypeSection:
-            ntStatus = NtOpenSection(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenSection;
             break;
 
         case ObjectTypeJob:
-            ntStatus = NtOpenJobObject(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenJobObject;
             break;
 
         case ObjectTypeSession:
-            ntStatus = NtOpenSession(&objectHandle, DesiredAccess, &obja);
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenSession;
             break;
 
         case ObjectTypeMemoryPartition:
             if (g_ExtApiSet.NtOpenPartition) {
-                ntStatus = g_ExtApiSet.NtOpenPartition(&objectHandle, DesiredAccess, &obja);
+                ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)g_ExtApiSet.NtOpenPartition;
             }
-            else
-                ntStatus = STATUS_PROCEDURE_NOT_FOUND;
             break;
         default:
-            ntStatus = STATUS_INVALID_PARAMETER_2;
+            ObjectOpenProcedure = NULL;
             break;
         }
 
-        if (NT_SUCCESS(ntStatus))
-            *ObjectHandle = objectHandle;
+        if (ObjectOpenProcedure == NULL) {
+
+            ntStatus = STATUS_PROCEDURE_NOT_FOUND;
+
+        }
+        else {
+
+            ntStatus = ObjectOpenProcedure(&objectHandle, DesiredAccess, &obja);
+
+            if (NT_SUCCESS(ntStatus))
+                *ObjectHandle = objectHandle;
+        }
 
         NtClose(rootHandle);
     }
@@ -4378,9 +4430,9 @@ BOOL supxEnumAlpcPortsCallback(
 */
 NTSTATUS supOpenPortObjectByName(
     _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
     _Out_opt_ PHANDLE ReferenceHandle,
-    _In_ LPCWSTR ObjectName,
-    _In_ ACCESS_MASK DesiredAccess
+    _In_ LPCWSTR ObjectName
 )
 {
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
@@ -4472,8 +4524,8 @@ NTSTATUS supOpenPortObjectByName(
 */
 NTSTATUS supOpenPortObjectFromContext(
     _Out_ PHANDLE ObjectHandle,
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ ACCESS_MASK DesiredAccess
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ PROP_OBJECT_INFO* Context
 )
 {
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
@@ -4523,9 +4575,9 @@ NTSTATUS supOpenPortObjectFromContext(
                 // Open port by name.
                 //
                 ntStatus = supOpenPortObjectByName(ObjectHandle,
+                    DesiredAccess,
                     &refHandle,
-                    objectFullName,
-                    DesiredAccess);
+                    objectFullName);
 
                 if (NT_SUCCESS(ntStatus)) {
 
@@ -4691,8 +4743,8 @@ HANDLE supOpenObjectFromContext(
     case ObjectTypePort:
 
         ntStatus = supOpenPortObjectFromContext(&hObject,
-            Context, 
-            DesiredAccess); //variable access
+            DesiredAccess, //variable access
+            Context); 
 
         break;
     
@@ -6893,4 +6945,40 @@ VOID supQueryAlpcPortObjectTypeIndex(
     if (SeRestrictedSid) RtlFreeSid(SeRestrictedSid);
     if (pSD) supHeapFree(pSD);
 
+}
+
+/*
+* supQueryProcessImageFileNameWin32
+*
+* Purpose:
+*
+* Query Win32 process filename.
+*
+*/
+NTSTATUS supQueryProcessImageFileNameWin32(
+    _In_ HANDLE UniqueProcessId,
+    _Out_ PUNICODE_STRING *ProcessImageFileName
+)
+{
+    NTSTATUS ntStatus;
+    HANDLE hProcess = NULL;
+
+    *ProcessImageFileName = NULL;
+
+    ntStatus = supOpenProcess(UniqueProcessId, 
+        PROCESS_QUERY_LIMITED_INFORMATION, 
+        &hProcess);
+
+    if (NT_SUCCESS(ntStatus)) {
+
+        ntStatus = supQueryProcessInformation(hProcess,
+            ProcessImageFileNameWin32,
+            ProcessImageFileName,
+            NULL);
+
+        NtClose(hProcess);
+
+    }
+
+    return ntStatus;
 }

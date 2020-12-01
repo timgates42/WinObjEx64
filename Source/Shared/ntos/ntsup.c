@@ -665,7 +665,7 @@ PVOID ntsupGetSystemInfoEx(
 *
 * Returns buffer with system information by given SystemInformationClass.
 *
-* Returned buffer must be freed with supHeapFree after usage.
+* Returned buffer must be freed with ntsupHeapFree after usage.
 *
 */
 PVOID ntsupGetSystemInfo(
@@ -897,6 +897,66 @@ BOOL ntsupQueryProcessEntryById(
     return FALSE;
 }
 
+/*
+* ntsupQueryProcessInformation
+*
+* Purpose:
+*
+* Query process information with variable size.
+* 
+* Returned buffer must be freed with ntsupHeapFree after usage.
+*
+*/
+NTSTATUS ntsupQueryProcessInformation(
+    _In_ HANDLE ProcessHandle,
+    _In_ PROCESSINFOCLASS ProcessInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength
+)
+{
+    NTSTATUS ntStatus;
+    PVOID queryBuffer;
+    ULONG returnLength = 0;
+
+    *Buffer = NULL;
+    if (ReturnLength) *ReturnLength = 0;
+
+    ntStatus = NtQueryInformationProcess(ProcessHandle,
+        ProcessInformationClass,
+        NULL,
+        0,
+        &returnLength);
+
+    //
+    // Test all possible acceptable failures.
+    //
+    if (ntStatus != STATUS_BUFFER_OVERFLOW &&
+        ntStatus != STATUS_BUFFER_TOO_SMALL &&
+        ntStatus != STATUS_INFO_LENGTH_MISMATCH)
+    {
+        return ntStatus;
+    }
+
+    queryBuffer = ntsupHeapAlloc(returnLength);
+    if (queryBuffer == NULL)
+        return STATUS_INSUFFICIENT_RESOURCES;
+
+    ntStatus = NtQueryInformationProcess(ProcessHandle,
+        ProcessInformationClass,
+        queryBuffer,
+        returnLength,
+        &returnLength);
+
+    if (NT_SUCCESS(ntStatus)) {
+        *Buffer = queryBuffer;
+        if (ReturnLength) *ReturnLength = returnLength;
+    }
+    else {
+        ntsupHeapFree(queryBuffer);
+    }
+
+    return ntStatus;
+}
 
 /*
 * ntsupQueryHVCIState

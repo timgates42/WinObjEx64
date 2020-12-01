@@ -615,6 +615,9 @@ VOID MainWindowHandleObjectPopupMenu(
 
     objType = supObjectListGetObjectType(hwndlv, iItem);
 
+    //
+    // Only supOpenNamedObjectByType supported types.
+    //
     switch (objType) {
 
         //
@@ -635,26 +638,21 @@ VOID MainWindowHandleObjectPopupMenu(
         // Intentionally do not 'break' here.
         //
 
-    case ObjectTypeDevice:
-    case ObjectTypeSection:
-    case ObjectTypePort:
-    case ObjectTypeKey:
-    case ObjectTypeEvent:
-    case ObjectTypeJob:
-    case ObjectTypeMutant:
     case ObjectTypeDirectory:
-    case ObjectTypeWinstation:
-    case ObjectTypeSemaphore:
-    case ObjectTypeTimer:
-    case ObjectTypeSession:
-    case ObjectTypeDesktop:
-    case ObjectTypeWMIGuid:
+    case ObjectTypeDevice:
+    case ObjectTypeEvent:
+    case ObjectTypeEventPair:
     case ObjectTypeIoCompletion:
-    case ObjectTypeTmTx:
-    case ObjectTypeTmTm:
-    case ObjectTypeTmRm:
-    case ObjectTypeTmEn:
+    case ObjectTypeJob:
+    case ObjectTypeKey:
+    case ObjectTypeKeyedEvent:
     case ObjectTypeMemoryPartition:
+    case ObjectTypeMutant:
+    case ObjectTypePort:
+    case ObjectTypeSection:
+    case ObjectTypeSemaphore:
+    case ObjectTypeSession:
+    case ObjectTypeTimer:
 
         MainWindowPopupMenuInsertViewSD(hMenu, uPosition);
         break;

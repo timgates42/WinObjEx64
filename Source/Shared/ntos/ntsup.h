@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.02
+*  VERSION:     2.04
 *
-*  DATE:        23 July 2020
+*  DATE:        29 Nov 2020
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -162,6 +162,12 @@ BOOL ntsupQueryProcessEntryById(
     _In_ HANDLE UniqueProcessId,
     _In_ PVOID ProcessList,
     _Out_ PSYSTEM_PROCESSES_INFORMATION* Entry);
+
+NTSTATUS ntsupQueryProcessInformation(
+    _In_ HANDLE ProcessHandle,
+    _In_ PROCESSINFOCLASS ProcessInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength);
 
 BOOLEAN ntsupQueryHVCIState(
     _Out_ PBOOLEAN pbHVCIEnabled,
