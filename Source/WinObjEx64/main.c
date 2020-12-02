@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        30 Nov 2020
 *
 *  Program entry point and main window handler.
 *
@@ -20,10 +20,10 @@
 #include "global.h"
 #include "aboutDlg.h"
 #include "findDlg.h"
+#include "sdviewDlg.h"
 #include "treelist/treelist.h"
 #include "props/propDlg.h"
 #include "extras/extras.h"
-#include "tests/testunit.h"
 
 pswprintf_s rtl_swprintf_s;
 pqsort rtl_qsort;
@@ -167,6 +167,60 @@ VOID MainWindowHandleObjectTreeProp(
 }
 
 /*
+* MainWindowHandleObjectViewSD
+*
+* Purpose:
+*
+* Handler for View Security Descriptor menu.
+*
+*/
+VOID MainWindowHandleObjectViewSD(
+    _In_ HWND hwndParent,
+    _In_ BOOL fList
+)
+{
+    TV_ITEM tvi;
+    LVITEM lvi;
+    WOBJ_OBJECT_TYPE wobjType;
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    szBuffer[0] = 0;
+
+    if (fList) {
+
+        RtlSecureZeroMemory(&lvi, sizeof(LVITEM));
+        lvi.mask = LVIF_PARAM | LVIF_TEXT;
+        lvi.iItem = ListView_GetSelectionMark(g_hwndObjectList);
+        lvi.pszText = szBuffer;
+        lvi.cchTextMax = MAX_PATH;
+
+        if (!ListView_GetItem(g_hwndObjectList, &lvi))
+            return;
+        
+        wobjType = (WOBJ_OBJECT_TYPE)lvi.lParam;
+    }
+    else {
+
+        RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
+        tvi.pszText = szBuffer;
+        tvi.cchTextMax = MAX_PATH;
+        tvi.mask = TVIF_TEXT;
+        tvi.hItem = g_SelectedTreeItem;
+
+        if (!TreeView_GetItem(g_hwndObjectTree, &tvi))
+            return;
+
+        wobjType = ObjectTypeDirectory;
+    }
+
+    SDViewDialogCreate(hwndParent,
+        g_WinObj.CurrentObjectPath,
+        szBuffer,
+        wobjType);
+
+}
+
+/*
 * MainWindowHandleObjectListProp
 *
 * Purpose:
@@ -187,12 +241,6 @@ VOID MainWindowHandleObjectListProp(
     // Only one object properties dialog allowed at same time.
     //
     if (g_PropWindow != NULL)
-        return;
-
-    //
-    // Query selection, leave on failure.
-    //
-    if (ListView_GetSelectedCount(g_hwndObjectList) == 0)
         return;
 
     //
@@ -345,10 +393,7 @@ LRESULT MainWindowHandleWMCommand(
         break;
 
     case ID_VIEW_SECURITYDESCRIPTOR:
-        //
-        // TODO: FIXME
-        //
-        MessageBox(0, L"Test", L"", 0);
+        MainWindowHandleObjectViewSD(hwnd, (GetFocus() == g_hwndObjectList));
         break;
 
     case ID_FIND_FINDOBJECT:

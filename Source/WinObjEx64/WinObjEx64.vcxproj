@@ -410,6 +410,7 @@
     <ClCompile Include="props\propSecurity.c" />
     <ClCompile Include="props\propToken.c" />
     <ClCompile Include="props\propType.c" />
+    <ClCompile Include="sdviewDlg.c" />
     <ClCompile Include="sup.c" />
     <ClCompile Include="tests\testunit.c" />
     <ClCompile Include="tinyaes\aes.c" />
@@ -474,6 +475,7 @@
     <ClInclude Include="props\propType.h" />
     <ClInclude Include="props\propTypeConsts.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="sdviewDlg.h" />
     <ClInclude Include="sup.h" />
     <ClInclude Include="supConsts.h" />
     <ClInclude Include="tests\testunit.h" />

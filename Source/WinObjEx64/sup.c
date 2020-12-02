@@ -6974,7 +6974,9 @@ NTSTATUS supQueryProcessImageFileNameWin32(
         ntStatus = supQueryProcessInformation(hProcess,
             ProcessImageFileNameWin32,
             ProcessImageFileName,
-            NULL);
+            NULL,
+            (PNTSUPMEMALLOC)supHeapAlloc,
+            (PNTSUPMEMFREE)supHeapFree);
 
         NtClose(hProcess);
 

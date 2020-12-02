@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        23 July 2020
+*  DATE:        30 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -51,7 +51,6 @@ VOID AboutDialogInit(
     BOOLEAN  bHVCIEnabled = FALSE, bHVCIStrict = FALSE, bHVCIIUMEnabled = FALSE;
     ULONG    returnLength;
     NTSTATUS status;
-    HANDLE   hImage;
     WCHAR    szBuffer[MAX_PATH];
 
     PCHAR    wine_ver, wine_str;
@@ -69,20 +68,6 @@ VOID AboutDialogInit(
         PROGRAM_REVISION_NUMBER);
 
     SetDlgItemText(hwndDlg, ID_ABOUT_BUILDINFO, szBuffer);
-
-    //
-    // Set dialog icon.
-    //
-    hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 48, 48, LR_SHARED);
-    if (hImage) {
-        SendMessage(GetDlgItem(hwndDlg, ID_ABOUT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hImage);
-        DestroyIcon((HICON)hImage);
-    }
-
-    //
-    // Remove class icon if any.
-    //
-    SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
 
     //
     // Set compiler version and name.
@@ -740,7 +725,7 @@ VOID AboutDialogShowGlobals(
 *
 * Purpose:
 *
-* About Dialog Window Dialog Procedure
+* About Dialog Window Procedure
 *
 * During WM_INITDIALOG centers window and initializes system info
 *

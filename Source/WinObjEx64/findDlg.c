@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        30 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,6 +20,7 @@
 HWND FindDlgList;
 HWND FindDlgStatusBar = 0;
 HWND FindDialog = 0;
+HICON FindDialogIcon = 0;
 
 static LONG sizes_init = 0, dx1, dx2, dx3, dx4, dx5, dx6, dx7, dx8, dx9, dx10, dx11, dx12, dx13;
 
@@ -299,6 +300,9 @@ INT_PTR CALLBACK FindDlgProc(
         break;
 
     case WM_CLOSE:
+        if (FindDialogIcon)
+            DestroyIcon(FindDialogIcon);
+
         DestroyWindow(hwndDlg);
         FindDialog = NULL;
         g_WinObj.AuxDialogs[wobjFindDlgId] = NULL;
@@ -445,8 +449,6 @@ VOID FindDlgCreate(
     _In_ HWND hwndParent
 )
 {
-    HICON hIcon;
-
     //
     // Allow only one search dialog per time.
     //
@@ -461,13 +463,17 @@ VOID FindDlgCreate(
     FindDlgStatusBar = GetDlgItem(FindDialog, ID_SEARCH_STATUSBAR);
 
     //
-    // Set dialog icon, because we use shared dlg template this icon must be
-    // removed after use, see aboutDlg/propDlg.
+    // Set dialog icon.
     //
-    hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
-    if (hIcon) {
-        SetClassLongPtr(g_WinObj.AuxDialogs[wobjFindDlgId], GCLP_HICON, (LONG_PTR)hIcon);
-        DestroyIcon(hIcon);
+    FindDialogIcon = (HICON)LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDI_ICON_MAIN), 
+        IMAGE_ICON, 
+        32, 32, 
+        0);
+
+    if (FindDialogIcon) {
+        SendMessage(FindDialog, WM_SETICON, (WPARAM)ICON_SMALL, (LPARAM)FindDialogIcon);
+        SendMessage(FindDialog, WM_SETICON, (WPARAM)ICON_BIG, (LPARAM)FindDialogIcon);
     }
 
     FindDlgList = GetDlgItem(FindDialog, ID_SEARCH_LIST);

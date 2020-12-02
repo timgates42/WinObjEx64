@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        29 Nov 2020
+*  DATE:        30 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -152,7 +152,7 @@ VOID ProcessShowProperties(
             if (pusFileName->Buffer && pusFileName->Length)
                 supShowProperties(hwndDlg, pusFileName->Buffer);
 
-            ntsupHeapFree(pusFileName);
+            supHeapFree(pusFileName);
         }
 
     }
@@ -270,7 +270,9 @@ VOID ProcessQueryInfo(
             ntStatus = supQueryProcessInformation(hProcess,
                 ProcessImageFileNameWin32,
                 &pusFileName,
-                NULL);
+                NULL,
+                (PNTSUPMEMALLOC)supHeapAlloc,
+                (PNTSUPMEMFREE)supHeapFree);
 
             if (NT_SUCCESS(ntStatus)) {
                 if (pusFileName->Buffer && pusFileName->Length) {
@@ -279,7 +281,7 @@ VOID ProcessQueryInfo(
                         *pProcessIcon = hIcon;
                     }
                 }
-                ntsupHeapFree(pusFileName);
+                supHeapFree(pusFileName);
             }
 
             NtClose(hProcess);
@@ -686,10 +688,6 @@ VOID ProcessCopyText(
     INT     nSelection, i;
     SIZE_T  cbText, sz;
     LPWSTR  lpText, lpItemText[4];
-
-    if (ListView_GetSelectedCount(hwndList) == 0) {
-        return;
-    }
 
     nSelection = ListView_GetSelectionMark(hwndList);
     if (nSelection == -1) {

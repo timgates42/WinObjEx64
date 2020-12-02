@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        29 Nov 2020
+*  DATE:        30 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -271,6 +271,8 @@ INT_PTR CALLBACK SdtDialogProc(
     case WM_CLOSE:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
+
+            extrasRemoveDlgIcon(pDlgContext);
 
             dlgIndex = 0;
 
@@ -1712,7 +1714,7 @@ VOID extrasCreateSSDTDialog(
 
     SetWindowText(hwndDlg, szText);
 
-    extrasSetDlgIcon(hwndDlg);
+    extrasSetDlgIcon(pDlgContext);
 
     pDlgContext->ListView = GetDlgItem(hwndDlg, ID_EXTRASLIST);
     if (pDlgContext->ListView) {

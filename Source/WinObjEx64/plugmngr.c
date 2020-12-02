@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        30 Nov 2020
 *
 *  Plugin manager.
 *
@@ -598,12 +598,6 @@ BOOL PmpAllocateObjectData(
     ObjectPtr->Reserved = NULL;
 
     if (ParentWindow == g_hwndObjectList) {
-
-        //
-        // Query selection, leave on failure.
-        //
-        if (ListView_GetSelectedCount(g_hwndObjectList) == 0)
-            return FALSE;
 
         //
         // Query selected index, leave on failure.

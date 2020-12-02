@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        30 Nov 2020
 *
 *  Common header file for the Windows Object Explorer.
 *

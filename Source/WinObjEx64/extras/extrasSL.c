@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        30 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -363,6 +363,9 @@ INT_PTR CALLBACK SLCacheDialogProc(
     case WM_CLOSE:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
+
+            extrasRemoveDlgIcon(pDlgContext);
+
             g_WinObj.AuxDialogs[wobjSLCacheDlgId] = NULL;
 
             //
@@ -504,7 +507,7 @@ VOID extrasCreateSLCacheDialog(
     pDlgContext->hwndDlg = hwndDlg;
     g_WinObj.AuxDialogs[wobjSLCacheDlgId] = hwndDlg;
 
-    extrasSetDlgIcon(hwndDlg);
+    extrasSetDlgIcon(pDlgContext);
 
     //
     // Read and enumerate cache.

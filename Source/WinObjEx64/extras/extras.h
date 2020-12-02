@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        29 Nov 2020
+*  DATE:        30 Nov 2020
 *
 *  Common header file for Extras dialogs.
 *
@@ -34,6 +34,7 @@ typedef struct _EXTRASCONTEXT {
         ULONG_PTR DialogMode;
     };
     HICON ObjectIcon;
+    HICON DialogIcon;
 } EXTRASCONTEXT, *PEXTRASCONTEXT;
 
 typedef struct _EXTRASCALLBACK {
@@ -64,7 +65,10 @@ VOID extrasSimpleListResize(
     _In_ HWND hwndDlg);
 
 VOID extrasSetDlgIcon(
-    _In_ HWND hwndDlg);
+    _In_ EXTRASCONTEXT* Context);
+
+VOID extrasRemoveDlgIcon(
+    _In_ EXTRASCONTEXT* Context);
 
 VOID extrasShowDialogById(
     _In_ HWND ParentWindow,

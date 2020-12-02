@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        30 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1595,13 +1595,13 @@ VOID propBasicQueryProcess(
     BOOL RemotePebRead = FALSE;
     BOOL bSuccess = FALSE;
 
-    ULONG i, BreakOnTermination = 0, memIO;
+    ULONG i, BreakOnTermination = 0;
     HANDLE hObject;
     PROCESS_EXTENDED_BASIC_INFORMATION exbi;
     RTL_USER_PROCESS_PARAMETERS UserProcessParameters;
     PEB RemotePeb;
 
-    PUNICODE_STRING dynUstr;
+    PUNICODE_STRING pusInformation = NULL;
     SIZE_T readBytes;
 
     PS_PROTECTION PsProtection;
@@ -1705,38 +1705,30 @@ VOID propBasicQueryProcess(
         // Process image file.
         //
         bSuccess = FALSE;
-        memIO = 0;
-        NtQueryInformationProcess(hObject, ProcessImageFileNameWin32, NULL, 0, &memIO);
-        if (memIO) {
 
-            Buffer = (PBYTE)supHeapAlloc((SIZE_T)memIO);
-            if (Buffer) {
+        if (NT_SUCCESS(supQueryProcessInformation(hObject,
+            ProcessImageFileNameWin32,
+            &pusInformation,
+            NULL,
+            (PNTSUPMEMALLOC)supHeapAlloc,
+            (PNTSUPMEMFREE)supHeapFree)))
+        {
+            if ((pusInformation->Length) && (pusInformation->MaximumLength)) {
 
-                if (NT_SUCCESS(NtQueryInformationProcess(
-                    hObject,
-                    ProcessImageFileNameWin32,
-                    (PVOID)Buffer,
-                    memIO,
-                    &memIO)))
-                {
-                    dynUstr = (PUNICODE_STRING)Buffer;
-                    if ((dynUstr->Length) && (dynUstr->MaximumLength)) {
+                Name = (LPWSTR)supHeapAlloc(sizeof(UNICODE_NULL) + pusInformation->MaximumLength);
+                if (Name) {
 
-                        Name = (LPWSTR)supHeapAlloc(sizeof(UNICODE_NULL) + dynUstr->MaximumLength);
-                        if (Name) {
+                    RtlCopyMemory(Name, pusInformation->Buffer, pusInformation->Length);
+                    SetDlgItemText(hwndDlg, IDC_PROCESS_FILENAME, Name);
+                    EnableWindow(GetDlgItem(hwndDlg, IDC_PROCESS_BROWSE), TRUE);
+                    bSuccess = TRUE;
 
-                            RtlCopyMemory(Name, dynUstr->Buffer, dynUstr->Length);
-                            SetDlgItemText(hwndDlg, IDC_PROCESS_FILENAME, Name);
-                            EnableWindow(GetDlgItem(hwndDlg, IDC_PROCESS_BROWSE), TRUE);
-                            bSuccess = TRUE;
-
-                            supHeapFree(Name);
-                            Name = NULL;
-                        }
-                    }
+                    supHeapFree(Name);
+                    Name = NULL;
                 }
-                supHeapFree(Buffer);
             }
+
+            supHeapFree(pusInformation);
         }
 
         if (bSuccess == FALSE) {
@@ -1751,38 +1743,30 @@ VOID propBasicQueryProcess(
             //
             // Use new NtQIP info class to get command line.
             //
-            memIO = 0;
-            NtQueryInformationProcess(hObject, ProcessCommandLineInformation, NULL, 0, &memIO);
-            if (memIO) {
-                Buffer = (PBYTE)supHeapAlloc((SIZE_T)memIO);
-                if (Buffer) {
+            if (NT_SUCCESS(supQueryProcessInformation(hObject,
+                ProcessCommandLineInformation,
+                &pusInformation,
+                NULL,
+                (PNTSUPMEMALLOC)supHeapAlloc,
+                (PNTSUPMEMFREE)supHeapFree)))
+            {
+                if ((pusInformation->Length) && (pusInformation->MaximumLength)) {
 
-                    if (NT_SUCCESS(NtQueryInformationProcess(
-                        hObject,
-                        ProcessCommandLineInformation,
-                        (PVOID)Buffer,
-                        memIO,
-                        &memIO)))
-                    {
-                        dynUstr = (PUNICODE_STRING)Buffer;
-                        if ((dynUstr->Length) && (dynUstr->MaximumLength)) {
+                    Name = (LPWSTR)supHeapAlloc((SIZE_T)pusInformation->MaximumLength + sizeof(UNICODE_NULL));
+                    if (Name) {
 
-                            Name = (LPWSTR)supHeapAlloc((SIZE_T)dynUstr->MaximumLength + sizeof(UNICODE_NULL));
-                            if (Name) {
+                        RtlCopyMemory(Name, pusInformation->Buffer, pusInformation->Length);
 
-                                RtlCopyMemory(Name, dynUstr->Buffer, dynUstr->Length);
+                        SetDlgItemText(hwndDlg, IDC_PROCESS_CMDLINE, Name);
+                        bSuccess = TRUE;
 
-                                SetDlgItemText(hwndDlg, IDC_PROCESS_CMDLINE, Name);
-                                bSuccess = TRUE;
-
-                                supHeapFree(Name);
-                                Name = NULL;
-                            }
-                        }
+                        supHeapFree(Name);
+                        Name = NULL;
                     }
-                    supHeapFree(Buffer);
                 }
+                supHeapFree(pusInformation);
             }
+
         }
         else {
             //

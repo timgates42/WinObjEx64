@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        29 Nov 2020
+*  DATE:        30 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -509,6 +509,7 @@ INT_PTR CALLBACK DriversDialogProc(
         break;
 
     case WM_CLOSE:
+        extrasRemoveDlgIcon(&DrvDlgContext);
         DestroyWindow(hwndDlg);
         g_WinObj.AuxDialogs[wobjDriversDlgId] = NULL;
         supDestroyShimmedDriversList(&g_kdctx.KseEngineDump.ShimmedDriversDumpListHead);
@@ -609,7 +610,7 @@ VOID extrasCreateDriversDialog(
     DrvDlgContext.StatusBar = GetDlgItem(DrvDlgContext.hwndDlg, ID_EXTRASLIST_STATUSBAR);
     SendMessage(DrvDlgContext.StatusBar, SB_SETPARTS, 2, (LPARAM)&SbParts);
 
-    extrasSetDlgIcon(DrvDlgContext.hwndDlg);
+    extrasSetDlgIcon(&DrvDlgContext);
 
     DrvDlgContext.ListView = GetDlgItem(DrvDlgContext.hwndDlg, ID_EXTRASLIST);
     if (DrvDlgContext.ListView) {

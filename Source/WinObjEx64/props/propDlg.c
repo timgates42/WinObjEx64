@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        30 Nov 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -886,9 +886,6 @@ VOID propCreateDialog(
     hwndDlg = (HWND)PropertySheet(&PropHeader);
 
     if (hwndDlg) {
-
-        //remove class icon if any
-        SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
 
         if (propContext->ContextType == propPrivateNamespace) {
             g_NamespacePropWindow = hwndDlg;
