@@ -904,14 +904,16 @@ BOOL ntsupQueryProcessEntryById(
 *
 * Query process information with variable size.
 * 
-* Returned buffer must be freed with ntsupHeapFree after usage.
+* Returned buffer must be freed with FreeMem after usage.
 *
 */
 NTSTATUS ntsupQueryProcessInformation(
     _In_ HANDLE ProcessHandle,
     _In_ PROCESSINFOCLASS ProcessInformationClass,
     _Out_ PVOID* Buffer,
-    _Out_opt_ PULONG ReturnLength
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
 )
 {
     NTSTATUS ntStatus;
@@ -937,7 +939,7 @@ NTSTATUS ntsupQueryProcessInformation(
         return ntStatus;
     }
 
-    queryBuffer = ntsupHeapAlloc(returnLength);
+    queryBuffer = AllocMem(returnLength);
     if (queryBuffer == NULL)
         return STATUS_INSUFFICIENT_RESOURCES;
 
@@ -952,7 +954,7 @@ NTSTATUS ntsupQueryProcessInformation(
         if (ReturnLength) *ReturnLength = returnLength;
     }
     else {
-        ntsupHeapFree(queryBuffer);
+        FreeMem(queryBuffer);
     }
 
     return ntStatus;

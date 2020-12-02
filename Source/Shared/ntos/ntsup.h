@@ -167,7 +167,9 @@ NTSTATUS ntsupQueryProcessInformation(
     _In_ HANDLE ProcessHandle,
     _In_ PROCESSINFOCLASS ProcessInformationClass,
     _Out_ PVOID* Buffer,
-    _Out_opt_ PULONG ReturnLength);
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
 
 BOOLEAN ntsupQueryHVCIState(
     _Out_ PBOOLEAN pbHVCIEnabled,
