@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        01 Dec 2020
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -436,7 +436,7 @@ INT_PTR CALLBACK IpcTypeDialogProc(
         break;
 
     case WM_DESTROY:
-        Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
+        Context = (PROP_OBJECT_INFO*)RemoveProp(hwndDlg, T_PROPCONTEXT);
         if (Context) {
             pDlgContext = (EXTRASCONTEXT*)Context->Tag;
             if (pDlgContext) {
@@ -444,7 +444,6 @@ INT_PTR CALLBACK IpcTypeDialogProc(
                 pDlgContext->ObjectIcon = NULL;
             }
         }
-        RemoveProp(hwndDlg, T_PROPCONTEXT);
         break;
 
     }
@@ -761,12 +760,8 @@ INT_PTR CALLBACK IpcDlgProc(
         supCenterWindow(hwndDlg);
         break;
 
-    case WM_DESTROY:
-        RemoveProp(hwndDlg, T_IPCDLGCONTEXT);
-        break;
-
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_IPCDLGCONTEXT);
         if (pDlgContext) {
 
             ImageList_Destroy(pDlgContext->ImageList);

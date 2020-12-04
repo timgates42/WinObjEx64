@@ -2851,12 +2851,12 @@ BOOL supGetWin32FileName(
 )
 {
     BOOL                bResult = FALSE;
-    NTSTATUS            status = STATUS_UNSUCCESSFUL;
+    NTSTATUS            ntStatus = STATUS_UNSUCCESSFUL;
     HANDLE              hFile = NULL;
     UNICODE_STRING      NtFileName;
     OBJECT_ATTRIBUTES   obja;
     IO_STATUS_BLOCK     iost;
-    ULONG               memIO;
+
     BYTE* Buffer = NULL;
 
     if ((Win32FileName == NULL) || (ccWin32FileName < MAX_PATH)) {
@@ -2864,43 +2864,40 @@ BOOL supGetWin32FileName(
         return FALSE;
     }
 
-    do {
+    RtlInitUnicodeString(&NtFileName, FileName);
+    InitializeObjectAttributes(&obja, &NtFileName, OBJ_CASE_INSENSITIVE, 0, NULL);
 
-        RtlInitUnicodeString(&NtFileName, FileName);
-        InitializeObjectAttributes(&obja, &NtFileName, OBJ_CASE_INSENSITIVE, 0, NULL);
+    ntStatus = NtCreateFile(&hFile,
+        SYNCHRONIZE,
+        &obja,
+        &iost,
+        NULL,
+        0,
+        FILE_SHARE_VALID_FLAGS,
+        FILE_OPEN,
+        FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE,
+        NULL, 0);
 
-        status = NtCreateFile(&hFile, SYNCHRONIZE, &obja, &iost, NULL, 0,
-            FILE_SHARE_VALID_FLAGS, FILE_OPEN,
-            FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE, NULL, 0);
+    if (NT_SUCCESS(ntStatus)) {
 
-        if (!NT_SUCCESS(status))
-            break;
+        ntStatus = supQueryObjectInformation(hFile,
+            ObjectNameInformation,
+            &Buffer,
+            NULL,
+            (PNTSUPMEMALLOC)supHeapAlloc,
+            (PNTSUPMEMFREE)supHeapFree);
 
-        memIO = 0;
-        status = NtQueryObject(hFile, ObjectNameInformation, NULL, 0, &memIO);
-        if (status != STATUS_INFO_LENGTH_MISMATCH)
-            break;
+        if (NT_SUCCESS(ntStatus)) {
 
-        Buffer = (BYTE*)supHeapAlloc(memIO);
-        if (Buffer == NULL)
-            break;
+            bResult = supxConvertFileName(((POBJECT_NAME_INFORMATION)Buffer)->Name.Buffer,
+                Win32FileName,
+                ccWin32FileName);
 
-        status = NtQueryObject(hFile, ObjectNameInformation, Buffer, memIO, NULL);
-        if (!NT_SUCCESS(status))
-            break;
+            supHeapFree(Buffer);
+        }
 
-        if (!supxConvertFileName(((PUNICODE_STRING)Buffer)->Buffer, Win32FileName, ccWin32FileName))
-            break;
-
-        bResult = TRUE;
-
-    } while (FALSE);
-
-    if (hFile)
         NtClose(hFile);
-
-    if (Buffer != NULL)
-        supHeapFree(Buffer);
+    }
 
     return bResult;
 }
@@ -4146,11 +4143,6 @@ NTSTATUS supOpenNamedObjectByType(
         //
         // Open object directory.
         //
-        if (TypeIndex == ObjectTypeDirectory) {
-            if (ObjectName != NULL) // Invalid parameters mix.
-                return STATUS_INVALID_PARAMETER_4;
-        }
-
         RtlInitUnicodeString(&ustr, ObjectDirectory);
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
@@ -4176,6 +4168,10 @@ NTSTATUS supOpenNamedObjectByType(
         switch (TypeIndex) {
         case ObjectTypeDevice:
             ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)supOpenDeviceObject;
+            break;
+
+        case ObjectTypeDirectory:
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenDirectoryObject;
             break;
 
         case ObjectTypeMutant:
@@ -4359,7 +4355,7 @@ BOOL supxEnumAlpcPortsCallback(
             break;
 
         //
-        // Query object name.
+        // Query object name, static buffer used for performance.
         //
         ntStatus = NtQueryObject(objectHandle,
             ObjectNameInformation,
@@ -4845,9 +4841,9 @@ VOID supShowNtStatus(
     _In_ NTSTATUS Status
 )
 {
-    PTCHAR lpMsg;
+    PWCHAR lpMsg;
     SIZE_T Length = _strlen(lpText);
-    lpMsg = (PTCHAR)supHeapAlloc(Length + 100);
+    lpMsg = (PWCHAR)supHeapAlloc(Length + 100);
     if (lpMsg) {
         _strcpy(lpMsg, lpText);
         ultohex((ULONG)Status, _strend(lpMsg));
@@ -4857,6 +4853,36 @@ VOID supShowNtStatus(
     else {
         kdDebugPrint("Memory allocation failure\r\n");
     }
+}
+
+/*
+* supFormatNtError
+*
+* Purpose:
+*
+* Format details about NT error to be displayed later.
+* 
+* Uppon success use LocalFree on returned buffer.
+*
+*/
+LPWSTR supFormatNtError(
+    _In_ NTSTATUS NtError
+)
+{
+    LPWSTR lpMessage = NULL;
+
+    FormatMessage(
+        FORMAT_MESSAGE_FROM_HMODULE | 
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        (LPCVOID)GetModuleHandle(L"ntdll.dll"),
+        NtError,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPWSTR)&lpMessage,
+        0,
+        NULL);
+
+    return lpMessage;
 }
 
 /*
@@ -5234,6 +5260,45 @@ BOOL supGetListViewItemParam(
 }
 
 /*
+* supGetSidUseName
+*
+* Purpose:
+*
+* Translate SidUseName to string name.
+*
+*/
+LPWSTR supGetSidUseName(
+    _In_ SID_NAME_USE SidNameUse
+)
+{
+    switch (SidNameUse) {
+    case SidTypeUser:
+        return L"User";
+    case SidTypeGroup:
+        return L"Group";
+    case SidTypeDomain:
+        return L"Domain";
+    case SidTypeAlias:
+        return L"Alias";
+    case SidTypeWellKnownGroup:
+        return L"WellKnownGroup";
+    case SidTypeDeletedAccount:
+        return L"DeletedAccount";
+    case SidTypeInvalid:
+        return L"Invalid";
+    case SidTypeComputer:
+        return L"Computer";
+    case SidTypeLogonSession:
+        return L"LogonSession";
+    case SidTypeLabel:
+        return L"Label";
+    case SidTypeUnknown:
+    default:
+        return T_Unknown;
+    }
+}
+
+/*
 * supIntegrityToString
 *
 * Purpose:
@@ -5280,6 +5345,71 @@ LPWSTR supIntegrityToString(
 }
 
 /*
+* supLookupSidUserAndDomainEx
+*
+* Purpose:
+*
+* Query user and domain name from given sid and policy handle.
+*
+*/
+BOOL supLookupSidUserAndDomainEx(
+    _In_ PSID Sid,
+    _In_ LSA_HANDLE PolicyHandle,
+    _Out_ LPWSTR* lpSidUserAndDomain
+)
+{
+    BOOL bResult = FALSE;
+    NTSTATUS Status;
+    ULONG Length;
+    LPWSTR UserAndDomainName = NULL, P;
+    PLSA_REFERENCED_DOMAIN_LIST ReferencedDomains = NULL;
+    PLSA_TRANSLATED_NAME Names = NULL;
+
+    *lpSidUserAndDomain = NULL;
+
+    Status = LsaLookupSids(
+        PolicyHandle,
+        1,
+        (PSID*)&Sid,
+        (PLSA_REFERENCED_DOMAIN_LIST*)&ReferencedDomains,
+        (PLSA_TRANSLATED_NAME*)&Names);
+
+    if ((NT_SUCCESS(Status)) && (Status != STATUS_SOME_NOT_MAPPED)) {
+
+        Length = 0;
+
+        if ((ReferencedDomains != NULL) && (Names != NULL)) {
+
+            Length = 4 + ReferencedDomains->Domains[0].Name.MaximumLength +
+                Names->Name.MaximumLength;
+
+            UserAndDomainName = (LPWSTR)supHeapAlloc(Length);
+            if (UserAndDomainName) {
+                P = UserAndDomainName;
+                if (ReferencedDomains->Domains[0].Name.Length) {
+                    RtlCopyMemory(UserAndDomainName,
+                        ReferencedDomains->Domains[0].Name.Buffer,
+                        ReferencedDomains->Domains[0].Name.Length);
+
+                    P = _strcat(UserAndDomainName, TEXT("\\"));
+                }
+
+                RtlCopyMemory(P,
+                    Names->Name.Buffer,
+                    Names->Name.Length);
+
+                *lpSidUserAndDomain = UserAndDomainName;
+                bResult = TRUE;
+            }
+        }
+        if (ReferencedDomains) LsaFreeMemory(ReferencedDomains);
+        if (Names) LsaFreeMemory(Names);
+    }
+
+    return bResult;
+}
+
+/*
 * supLookupSidUserAndDomain
 *
 * Purpose:
@@ -5293,13 +5423,8 @@ BOOL supLookupSidUserAndDomain(
 )
 {
     BOOL bResult = FALSE;
-    NTSTATUS Status;
-    ULONG Length;
-    LPWSTR UserAndDomainName = NULL, P;
     LSA_OBJECT_ATTRIBUTES lobja;
     LSA_HANDLE PolicyHandle = NULL;
-    PLSA_REFERENCED_DOMAIN_LIST ReferencedDomains = NULL;
-    PLSA_TRANSLATED_NAME Names = NULL;
     SECURITY_QUALITY_OF_SERVICE SecurityQualityOfService;
 
     *lpSidUserAndDomain = NULL;
@@ -5324,44 +5449,11 @@ BOOL supLookupSidUserAndDomain(
         POLICY_LOOKUP_NAMES,
         (PLSA_HANDLE)&PolicyHandle)))
     {
-        Status = LsaLookupSids(
+      
+        bResult = supLookupSidUserAndDomainEx(Sid,
             PolicyHandle,
-            1,
-            (PSID*)&Sid,
-            (PLSA_REFERENCED_DOMAIN_LIST*)&ReferencedDomains,
-            (PLSA_TRANSLATED_NAME*)&Names);
+            lpSidUserAndDomain);
 
-        if ((NT_SUCCESS(Status)) && (Status != STATUS_SOME_NOT_MAPPED)) {
-
-            Length = 0;
-
-            if ((ReferencedDomains != NULL) && (Names != NULL)) {
-
-                Length = 4 + ReferencedDomains->Domains[0].Name.MaximumLength +
-                    Names->Name.MaximumLength;
-
-                UserAndDomainName = (LPWSTR)supHeapAlloc(Length);
-                if (UserAndDomainName) {
-                    P = UserAndDomainName;
-                    if (ReferencedDomains->Domains[0].Name.Length) {
-                        RtlCopyMemory(UserAndDomainName,
-                            ReferencedDomains->Domains[0].Name.Buffer,
-                            ReferencedDomains->Domains[0].Name.Length);
-
-                        P = _strcat(UserAndDomainName, TEXT("\\"));
-                    }
-
-                    RtlCopyMemory(P,
-                        Names->Name.Buffer,
-                        Names->Name.Length);
-
-                    *lpSidUserAndDomain = UserAndDomainName;
-                    bResult = TRUE;
-                }
-            }
-            if (ReferencedDomains) LsaFreeMemory(ReferencedDomains);
-            if (Names) LsaFreeMemory(Names);
-        }
         LsaClose(PolicyHandle);
     }
 
@@ -6983,4 +7075,29 @@ NTSTATUS supQueryProcessImageFileNameWin32(
     }
 
     return ntStatus;
+}
+
+//TBD
+//FIXME
+PSID supGetSidFromAce(
+    _In_ PACE_HEADER AceHeader
+)
+{
+    PACCESS_ALLOWED_OBJECT_ACE paoc = (PACCESS_ALLOWED_OBJECT_ACE)AceHeader;
+
+    if (AceHeader->AceType >= ACCESS_MIN_MS_OBJECT_ACE_TYPE &&
+        AceHeader->AceType <= ACCESS_MAX_MS_OBJECT_ACE_TYPE)
+    {
+        switch (paoc->Flags & (ACE_OBJECT_TYPE_PRESENT | ACE_INHERITED_OBJECT_TYPE_PRESENT)) {
+        case 0:
+            return &((PACCESS_ALLOWED_OBJECT_ACE)AceHeader)->ObjectType;
+        case ACE_OBJECT_TYPE_PRESENT:
+        case ACE_INHERITED_OBJECT_TYPE_PRESENT:
+            return &((PACCESS_ALLOWED_OBJECT_ACE)AceHeader)->InheritedObjectType;
+        default:
+            return &((PACCESS_ALLOWED_OBJECT_ACE)AceHeader)->SidStart;
+        }
+    }
+
+    return &((PACCESS_ALLOWED_ACE)AceHeader)->SidStart;
 }

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        01 Dec 2020
 *
 *  Common header file for the program support routines.
 *
@@ -183,6 +183,8 @@ typedef struct tagVERHEAD {
 #define supQueryProcessName ntsupQueryProcessName
 #define supQueryProcessEntryById ntsupQueryProcessEntryById
 #define supQueryProcessInformation ntsupQueryProcessInformation
+#define supQueryObjectInformation ntsupQueryObjectInformation
+#define supQuerySecurityInformation ntsupQuerySecurityInformation
 #define supWriteBufferToFile ntsupWriteBufferToFile
 #define supQueryHVCIState ntsupQueryHVCIState
 #define supLookupImageSectionByName ntsupLookupImageSectionByName
@@ -496,6 +498,9 @@ VOID supShowLastError(
     _In_ LPWSTR Source,
     _In_ DWORD LastError);
 
+LPWSTR supFormatNtError(
+    _In_ NTSTATUS NtError);
+
 PSID supQueryTokenUserSid(
     _In_ HANDLE ProcessToken);
 
@@ -554,24 +559,38 @@ BOOL WINAPI supCallbackShowChildWindow(
     _In_ HWND hwnd,
     _In_ LPARAM lParam);
 
+LPWSTR supGetSidUseName(
+    _In_ SID_NAME_USE SidNameUse);
+
 LPWSTR supIntegrityToString(
     _In_ DWORD IntegrityLevel);
+
+BOOL supLookupSidUserAndDomainEx(
+    _In_ PSID Sid,
+    _In_ LSA_HANDLE PolicyHandle,
+    _Out_ LPWSTR * lpSidUserAndDomain);
 
 BOOL supLookupSidUserAndDomain(
     _In_ PSID Sid,
     _Out_ LPWSTR * lpSidUserAndDomain);
+
+PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
+    _In_ ULONG_PTR FilterUniqueProcessId,
+    _In_ BOOLEAN fObject);
 
 BOOL supHandlesQueryObjectAddress(
     _In_ PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList,
     _In_ HANDLE ObjectHandle,
     _Out_ PULONG_PTR ObjectAddress);
 
-PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
-    _In_ ULONG_PTR FilterUniqueProcessId,
-    _In_ BOOLEAN fObject);
-
 BOOL supHandlesFreeList(
     PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList);
+
+BOOL supPHLCreate(
+    _Inout_ PLIST_ENTRY ListHead,
+    _In_ PBYTE ProcessList,
+    _Out_ PULONG NumberOfProcesses,
+    _Out_ PULONG NumberOfThreads);
 
 VOID supPHLFree(
     _In_ PLIST_ENTRY ListHead,
@@ -580,12 +599,6 @@ VOID supPHLFree(
 HANDLE supPHLGetEntry(
     _In_ PLIST_ENTRY ListHead,
     _In_ HANDLE UniqueProcessId);
-
-BOOL supPHLCreate(
-    _Inout_ PLIST_ENTRY ListHead,
-    _In_ PBYTE ProcessList,
-    _Out_ PULONG NumberOfProcesses,
-    _Out_ PULONG NumberOfThreads);
 
 PVOID supSLCacheRead(
     VOID);

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        01 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -262,7 +262,7 @@ BOOL PNDlgQueryInfo(
     }
 
     return bResult;
-    }
+}
 
 #define MAX_LOOKUP_NAME 256
 

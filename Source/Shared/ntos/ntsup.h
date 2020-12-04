@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.04
 *
-*  DATE:        29 Nov 2020
+*  DATE:        30 Nov 2020
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -56,6 +56,13 @@
 extern "C" {
 #endif
 #endif
+
+typedef NTSTATUS(NTAPI* PFN_NTQUERYROUTINE)(
+   _In_ HANDLE ObjectHandle,
+   _In_ DWORD InformationClass,
+   _Out_writes_bytes_(ObjectInformationLength) PVOID ObjectInformation,
+   _In_ ULONG ObjectInformationLength,
+   _Out_opt_ PULONG ReturnLength);
 
 typedef PVOID(CALLBACK* PNTSUPMEMALLOC)(
     _In_ SIZE_T NumberOfBytes);
@@ -166,6 +173,31 @@ BOOL ntsupQueryProcessEntryById(
 NTSTATUS ntsupQueryProcessInformation(
     _In_ HANDLE ProcessHandle,
     _In_ PROCESSINFOCLASS ProcessInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
+
+NTSTATUS ntsupQueryObjectInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
+
+NTSTATUS ntsupQuerySecurityInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ SECURITY_INFORMATION SecurityInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
+
+NTSTATUS ntsupQuerySystemObjectInformationVariableSize(
+    _In_ PFN_NTQUERYROUTINE QueryRoutine,
+    _In_ HANDLE ObjectHandle,
+    _In_ DWORD InformationClass,
     _Out_ PVOID* Buffer,
     _Out_opt_ PULONG ReturnLength,
     _In_ PNTSUPMEMALLOC AllocMem,

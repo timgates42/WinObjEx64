@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        01 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -269,7 +269,7 @@ INT_PTR CALLBACK SdtDialogProc(
         break;
 
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
 
             extrasRemoveDlgIcon(pDlgContext);
@@ -281,8 +281,8 @@ INT_PTR CALLBACK SdtDialogProc(
             else if (pDlgContext->DialogMode == SST_Win32k)
                 dlgIndex = wobjW32SSTDlgId;
 
-            if ((dlgIndex == wobjKSSTDlgId)
-                || (dlgIndex == wobjW32SSTDlgId))
+            if ((dlgIndex == wobjKSSTDlgId) || 
+                (dlgIndex == wobjW32SSTDlgId))
             {
                 g_WinObj.AuxDialogs[dlgIndex] = NULL;
             }
@@ -338,10 +338,6 @@ INT_PTR CALLBACK SdtDialogProc(
 
         }
 
-        break;
-
-    case WM_DESTROY:
-        RemoveProp(hwndDlg, T_DLGCONTEXT);
         break;
 
     case WM_CONTEXTMENU:

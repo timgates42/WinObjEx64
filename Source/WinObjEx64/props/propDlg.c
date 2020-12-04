@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        01 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -448,11 +448,10 @@ LRESULT WINAPI PropSheetCustomWndProc(
         break;
 
     case WM_DESTROY:
-        Context = (PROP_OBJECT_INFO*)GetProp(hwnd, T_PROPCONTEXT);
+        Context = (PROP_OBJECT_INFO*)RemoveProp(hwnd, T_PROPCONTEXT);
         if (Context) {
             propContextDestroy(Context);
         }
-        RemoveProp(hwnd, T_PROPCONTEXT);
         break;
 
     case WM_CLOSE:

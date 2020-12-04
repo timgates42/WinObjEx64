@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        01 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -611,8 +611,8 @@ VOID propSetDefaultInfo(
 {
     INT      i;
     HWND     hwndCB;
-    NTSTATUS status;
-    ULONG    bytesNeeded;
+    NTSTATUS ntStatus;
+    ULONG    returnLength;
     WCHAR    szBuffer[100];
 
     OBJECT_BASIC_INFORMATION obi;
@@ -624,28 +624,29 @@ VOID propSetDefaultInfo(
     // Query object basic information.
     //
     RtlSecureZeroMemory(&obi, sizeof(obi));
-    status = NtQueryObject(hObject, ObjectBasicInformation, &obi,
-        sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
+    ntStatus = NtQueryObject(hObject, ObjectBasicInformation, &obi,
+        sizeof(OBJECT_BASIC_INFORMATION), &returnLength);
 
-    if (NT_SUCCESS(status)) {
+    if (NT_SUCCESS(ntStatus)) {
+
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
         //Reference Count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         u64tostr(obi.PointerCount, szBuffer);
         SetDlgItemText(hwndDlg, ID_OBJECT_REFC, szBuffer);
 
         //Handle Count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         u64tostr(obi.HandleCount, szBuffer);
         SetDlgItemText(hwndDlg, ID_OBJECT_HANDLES, szBuffer);
 
         //NonPagedPoolCharge
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         u64tostr(obi.NonPagedPoolCharge, szBuffer);
         SetDlgItemText(hwndDlg, ID_OBJECT_NP_CHARGE, szBuffer);
 
         //PagedPoolCharge
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         u64tostr(obi.PagedPoolCharge, szBuffer);
         SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
 
@@ -667,36 +668,26 @@ VOID propSetDefaultInfo(
     //
     // Set flag bit for next usage on Type page.
     //
-    do {
+    ntStatus = supQueryObjectInformation(hObject,
+        ObjectTypeInformation,
+        &TypeInfo,
+        NULL,
+        (PNTSUPMEMALLOC)supHeapAlloc,
+        (PNTSUPMEMFREE)supHeapFree);
 
-        bytesNeeded = 0;
-        status = NtQueryObject(hObject, ObjectTypeInformation, NULL, 0, &bytesNeeded);
-        if (bytesNeeded == 0) {
-            SetLastError(RtlNtStatusToDosError(status));
-            break;
+    if (NT_SUCCESS(ntStatus)) {
+
+        if (TypeInfo->SecurityRequired) {
+            SET_BIT(Context->ObjectFlags, 3);
+        }
+        if (TypeInfo->MaintainHandleCount) {
+            SET_BIT(Context->ObjectFlags, 4);
         }
 
-        TypeInfo = (POBJECT_TYPE_INFORMATION)supHeapAlloc(bytesNeeded + sizeof(ULONG_PTR));
-        if (TypeInfo == NULL)
-            break;
-
-        status = NtQueryObject(hObject, ObjectTypeInformation, TypeInfo, bytesNeeded, &bytesNeeded);
-        if (NT_SUCCESS(status)) {
-            if (TypeInfo->SecurityRequired) {
-                SET_BIT(Context->ObjectFlags, 3);
-            }
-            if (TypeInfo->MaintainHandleCount) {
-                SET_BIT(Context->ObjectFlags, 4);
-            }
-        }
-        else {
-            SetLastError(RtlNtStatusToDosError(status));
-        }
-
-    } while (FALSE);
-
-    if (TypeInfo) {
         supHeapFree(TypeInfo);
+    }
+    else {
+        SetLastError(RtlNtStatusToDosError(ntStatus));
     }
 }
 

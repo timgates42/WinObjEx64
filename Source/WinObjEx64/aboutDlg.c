@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        01 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,8 @@
 #include "global.h"
 #include "msvcver.h"
 #include "winedebug.h"
+
+#define T_ABOUTDLG_ICON_PROP TEXT("aboutDlgIcon")
 
 VALUE_DESC CodeIntegrityValuesList[] = {
     { L"CODEINTEGRITY_OPTION_ENABLED", CODEINTEGRITY_OPTION_ENABLED },
@@ -49,6 +51,7 @@ VOID AboutDialogInit(
 {
     BOOLEAN  bSecureBoot = FALSE;
     BOOLEAN  bHVCIEnabled = FALSE, bHVCIStrict = FALSE, bHVCIIUMEnabled = FALSE;
+    HANDLE   hImage;
     ULONG    returnLength;
     NTSTATUS status;
     WCHAR    szBuffer[MAX_PATH];
@@ -68,6 +71,23 @@ VOID AboutDialogInit(
         PROGRAM_REVISION_NUMBER);
 
     SetDlgItemText(hwndDlg, ID_ABOUT_BUILDINFO, szBuffer);
+
+    //
+    // Set dialog icon.
+    //
+    hImage = LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDI_ICON_MAIN),
+        IMAGE_ICON,
+        48, 48,
+        0);
+
+    if (hImage) {
+
+        SendMessage(GetDlgItem(hwndDlg, ID_ABOUT_ICON),
+            STM_SETIMAGE, IMAGE_ICON, (LPARAM)hImage);
+
+        SetProp(hwndDlg, T_ABOUTDLG_ICON_PROP, hImage);
+    }
 
     //
     // Set compiler version and name.
@@ -737,6 +757,8 @@ INT_PTR CALLBACK AboutDialogProc(
     _In_ LPARAM lParam
 )
 {
+    HANDLE hIcon;
+
     UNREFERENCED_PARAMETER(lParam);
 
     switch (uMsg) {
@@ -751,6 +773,10 @@ INT_PTR CALLBACK AboutDialogProc(
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDOK:
         case IDCANCEL:
+            hIcon = RemoveProp(hwndDlg, T_ABOUTDLG_ICON_PROP);
+            if (hIcon) {
+                DestroyIcon(hIcon);
+            }
             return EndDialog(hwndDlg, S_OK);
             break;
         case IDC_ABOUT_GLOBALS:

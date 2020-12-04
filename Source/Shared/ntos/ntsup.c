@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.02
+*  VERSION:     2.04
 *
-*  DATE:        22 July 2020
+*  DATE:        01 Dec 2020
 *
 *  Native API support functions.
 *
@@ -898,18 +898,19 @@ BOOL ntsupQueryProcessEntryById(
 }
 
 /*
-* ntsupQueryProcessInformation
+* ntsupQuerySystemObjectInformationVariableSize
 *
 * Purpose:
 *
-* Query process information with variable size.
-* 
-* Returned buffer must be freed with FreeMem after usage.
+* Generic object information query routine.
+*
+* Use FreeMem to release allocated buffer.
 *
 */
-NTSTATUS ntsupQueryProcessInformation(
-    _In_ HANDLE ProcessHandle,
-    _In_ PROCESSINFOCLASS ProcessInformationClass,
+NTSTATUS ntsupQuerySystemObjectInformationVariableSize(
+    _In_ PFN_NTQUERYROUTINE QueryRoutine,
+    _In_ HANDLE ObjectHandle,
+    _In_ DWORD InformationClass,
     _Out_ PVOID* Buffer,
     _Out_opt_ PULONG ReturnLength,
     _In_ PNTSUPMEMALLOC AllocMem,
@@ -923,8 +924,8 @@ NTSTATUS ntsupQueryProcessInformation(
     *Buffer = NULL;
     if (ReturnLength) *ReturnLength = 0;
 
-    ntStatus = NtQueryInformationProcess(ProcessHandle,
-        ProcessInformationClass,
+    ntStatus = QueryRoutine(ObjectHandle,
+        InformationClass,
         NULL,
         0,
         &returnLength);
@@ -943,8 +944,8 @@ NTSTATUS ntsupQueryProcessInformation(
     if (queryBuffer == NULL)
         return STATUS_INSUFFICIENT_RESOURCES;
 
-    ntStatus = NtQueryInformationProcess(ProcessHandle,
-        ProcessInformationClass,
+    ntStatus = QueryRoutine(ObjectHandle,
+        InformationClass,
         queryBuffer,
         returnLength,
         &returnLength);
@@ -958,6 +959,93 @@ NTSTATUS ntsupQueryProcessInformation(
     }
 
     return ntStatus;
+}
+
+/*
+* ntsupQueryProcessInformation
+*
+* Purpose:
+*
+* Query process information with variable size.
+* 
+* Returned buffer must be freed with FreeMem after usage.
+*
+*/
+NTSTATUS ntsupQueryProcessInformation(
+    _In_ HANDLE ProcessHandle,
+    _In_ PROCESSINFOCLASS ProcessInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
+)
+{
+    return ntsupQuerySystemObjectInformationVariableSize(
+        (PFN_NTQUERYROUTINE)NtQueryInformationProcess,
+        ProcessHandle,
+        (DWORD)ProcessInformationClass,
+        Buffer,
+        ReturnLength,
+        AllocMem,
+        FreeMem);
+}
+
+/*
+* ntsupQueryObjectInformation
+*
+* Purpose:
+*
+* Query object information with variable size.
+*
+* Returned buffer must be freed with FreeMem after usage.
+*
+*/
+NTSTATUS ntsupQueryObjectInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
+)
+{
+    return ntsupQuerySystemObjectInformationVariableSize(
+        (PFN_NTQUERYROUTINE)NtQueryObject,
+        ObjectHandle,
+        (DWORD)ObjectInformationClass,
+        Buffer,
+        ReturnLength,
+        AllocMem,
+        FreeMem);
+}
+
+/*
+* ntsupQuerySecurityInformation
+*
+* Purpose:
+*
+* Query object security information with variable size.
+*
+* Returned buffer must be freed with FreeMem after usage.
+*
+*/
+NTSTATUS ntsupQuerySecurityInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ SECURITY_INFORMATION SecurityInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
+)
+{
+    return ntsupQuerySystemObjectInformationVariableSize(
+        (PFN_NTQUERYROUTINE)NtQuerySecurityObject,
+        ObjectHandle,
+        (DWORD)SecurityInformationClass,
+        Buffer,
+        ReturnLength,
+        AllocMem,
+        FreeMem);
 }
 
 /*

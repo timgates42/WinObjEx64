@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        01 Dec 2020
 *
 *  Program entry point and main window handler.
 *
@@ -179,12 +179,13 @@ VOID MainWindowHandleObjectViewSD(
     _In_ BOOL fList
 )
 {
-    TV_ITEM tvi;
     LVITEM lvi;
+    LPWSTR lpObjectDirectory, lpObjectName = NULL;
     WOBJ_OBJECT_TYPE wobjType;
     WCHAR szBuffer[MAX_PATH + 1];
 
     szBuffer[0] = 0;
+    lpObjectDirectory = g_WinObj.CurrentObjectPath;
 
     if (fList) {
 
@@ -196,26 +197,19 @@ VOID MainWindowHandleObjectViewSD(
 
         if (!ListView_GetItem(g_hwndObjectList, &lvi))
             return;
-        
+
         wobjType = (WOBJ_OBJECT_TYPE)lvi.lParam;
+        lpObjectName = (LPWSTR)&szBuffer;
+
     }
     else {
-
-        RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
-        tvi.pszText = szBuffer;
-        tvi.cchTextMax = MAX_PATH;
-        tvi.mask = TVIF_TEXT;
-        tvi.hItem = g_SelectedTreeItem;
-
-        if (!TreeView_GetItem(g_hwndObjectTree, &tvi))
-            return;
 
         wobjType = ObjectTypeDirectory;
     }
 
     SDViewDialogCreate(hwndParent,
-        g_WinObj.CurrentObjectPath,
-        szBuffer,
+        lpObjectDirectory,
+        lpObjectName,
         wobjType);
 
 }
