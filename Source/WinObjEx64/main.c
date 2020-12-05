@@ -180,12 +180,11 @@ VOID MainWindowHandleObjectViewSD(
 )
 {
     LVITEM lvi;
-    LPWSTR lpObjectDirectory, lpObjectName = NULL;
+    TV_ITEM tvi;
     WOBJ_OBJECT_TYPE wobjType;
     WCHAR szBuffer[MAX_PATH + 1];
 
     szBuffer[0] = 0;
-    lpObjectDirectory = g_WinObj.CurrentObjectPath;
 
     if (fList) {
 
@@ -199,17 +198,25 @@ VOID MainWindowHandleObjectViewSD(
             return;
 
         wobjType = (WOBJ_OBJECT_TYPE)lvi.lParam;
-        lpObjectName = (LPWSTR)&szBuffer;
 
     }
     else {
+
+        RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
+        tvi.pszText = szBuffer;
+        tvi.cchTextMax = MAX_PATH;
+        tvi.mask = TVIF_TEXT;
+        tvi.hItem = g_SelectedTreeItem;
+
+        if (!TreeView_GetItem(g_hwndObjectTree, &tvi))
+            return;
 
         wobjType = ObjectTypeDirectory;
     }
 
     SDViewDialogCreate(hwndParent,
-        lpObjectDirectory,
-        lpObjectName,
+        g_WinObj.CurrentObjectPath,
+        szBuffer,
         wobjType);
 
 }

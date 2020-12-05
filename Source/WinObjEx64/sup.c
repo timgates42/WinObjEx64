@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        29 Nov 2020
+*  DATE:        04 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2643,26 +2643,26 @@ BOOL supQuerySectionFileInfo(
 *
 * Purpose:
 *
-* Open directory for given object, handle self case
+* Open directory for given object, handle self case.
 *
 */
-HANDLE supOpenDirectoryForObject(
+NTSTATUS supOpenDirectoryForObject(
+    _Out_ PHANDLE DirectoryHandle,
     _In_ LPWSTR lpObjectName,
     _In_ LPWSTR lpDirectory
 )
 {
     BOOL   needFree = FALSE;
-    HANDLE hDirectory;
+    NTSTATUS ntStatus;
     SIZE_T i, l, rdirLen, ldirSz;
     LPWSTR SingleDirName, LookupDirName;
 
-    if (
-        (lpObjectName == NULL) ||
-        (lpDirectory == NULL)
-        )
-    {
-        return NULL;
-    }
+    *DirectoryHandle = NULL;
+
+    if (lpObjectName == NULL)
+        return STATUS_INVALID_PARAMETER_2;
+    if (lpDirectory == NULL)
+        return STATUS_INVALID_PARAMETER_3;
 
     LookupDirName = lpDirectory;
 
@@ -2686,7 +2686,7 @@ HANDLE supOpenDirectoryForObject(
         ldirSz = rdirLen * sizeof(WCHAR) + sizeof(UNICODE_NULL);
         LookupDirName = (LPWSTR)supHeapAlloc(ldirSz);
         if (LookupDirName == NULL)
-            return NULL;
+            return STATUS_INSUFFICIENT_RESOURCES;
 
         needFree = TRUE;
 
@@ -2698,13 +2698,13 @@ HANDLE supOpenDirectoryForObject(
     //
     // 3) Open directory
     //
-    hDirectory = supOpenDirectory(NULL, LookupDirName, DIRECTORY_QUERY);
+    ntStatus = supOpenDirectory(DirectoryHandle, NULL, LookupDirName, DIRECTORY_QUERY);
 
     if (needFree) {
         supHeapFree(LookupDirName);
     }
 
-    return hDirectory;
+    return ntStatus;
 }
 
 /*
@@ -3071,16 +3071,14 @@ HWINSTA supOpenWindowStationFromContext(
 * Note: hObject must be opened with READ_CONTROL.
 *
 */
-BOOL supQueryObjectTrustLabel(
+NTSTATUS supQueryObjectTrustLabel(
     _In_ HANDLE hObject,
     _Out_ PULONG ProtectionType,
     _Out_ PULONG ProtectionLevel)
 {
-    BOOL                            bResult = FALSE;
     BOOLEAN                         saclPresent = FALSE, saclDefaulted = FALSE;
-    ULONG                           i, Length = 0, returnLength = 0;
-
-    NTSTATUS                        Status;
+    ULONG                           i;
+    NTSTATUS                        ntStatus;
 
     PSID                            aceSID;
     PACL                            sacl = NULL;
@@ -3098,48 +3096,44 @@ BOOL supQueryObjectTrustLabel(
         //
         // Query Security Descriptor for given object.
         //
-        Length = PAGE_SIZE;
-        pSD = (PSECURITY_DESCRIPTOR)supHeapAlloc((SIZE_T)Length);
-        if (pSD == NULL)
-            break;
 
-        Status = NtQuerySecurityObject(hObject,
+        ntStatus = supQuerySecurityInformation(hObject,
             PROCESS_TRUST_LABEL_SECURITY_INFORMATION,
-            pSD, Length, &returnLength);
+            &pSD,
+            NULL);
 
-        if (Status == STATUS_BUFFER_TOO_SMALL) {
-            supHeapFree(pSD);
-
-            pSD = (PSECURITY_DESCRIPTOR)supHeapAlloc((SIZE_T)returnLength);
-            if (pSD == NULL)
-                break;
-
-            Status = NtQuerySecurityObject(hObject,
-                PROCESS_TRUST_LABEL_SECURITY_INFORMATION,
-                pSD, Length, &returnLength);
-        }
-
-        if (!NT_SUCCESS(Status))
+        if (!NT_SUCCESS(ntStatus)) {
             break;
+        }
 
         //
         // Query SACL from SD.
         //
-        if (!NT_SUCCESS(RtlGetSaclSecurityDescriptor(pSD,
+        ntStatus = RtlGetSaclSecurityDescriptor(pSD,
             &saclPresent,
             &sacl,
-            &saclDefaulted))) break;
+            &saclDefaulted);
 
-        if (!sacl)
+        if (!NT_SUCCESS(ntStatus)) {
             break;
+        }
+
+        if (!sacl) {
+            ntStatus = STATUS_INVALID_SID;
+            break;
+        }
 
         //
         // Query SACL size.
         //
-        if (!NT_SUCCESS(RtlQueryInformationAcl(sacl,
+        ntStatus = RtlQueryInformationAcl(sacl,
             &aclSize,
             sizeof(aclSize),
-            AclSizeInformation))) break;
+            AclSizeInformation);
+
+        if (!NT_SUCCESS(ntStatus)) {
+            break;
+        }
 
         //
         // Locate trust label ace.
@@ -3151,7 +3145,7 @@ BOOL supQueryObjectTrustLabel(
                     aceSID = (PSID)(&ace->SidStart);
                     *ProtectionType = *RtlSubAuthoritySid(aceSID, 0);
                     *ProtectionLevel = *RtlSubAuthoritySid(aceSID, 1);
-                    bResult = TRUE;
+                    ntStatus = STATUS_SUCCESS;
                     break;
                 }
             }
@@ -3161,7 +3155,7 @@ BOOL supQueryObjectTrustLabel(
 
     if (pSD) supHeapFree(pSD);
 
-    return bResult;
+    return ntStatus;
 }
 
 /*
@@ -4057,7 +4051,7 @@ NTSTATUS supOpenNamedObjectByType(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
     _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName,
+    _In_ LPWSTR ObjectName,
     _In_ ACCESS_MASK DesiredAccess
 )
 {
@@ -4076,6 +4070,9 @@ NTSTATUS supOpenNamedObjectByType(
     if (ObjectDirectory == NULL)
         return STATUS_INVALID_PARAMETER_3;
 
+    if (ObjectName == NULL)
+        return STATUS_INVALID_PARAMETER_4;
+
     if ((TypeIndex != ObjectTypeDirectory) &&
         (TypeIndex != ObjectTypeDevice) &&
         (TypeIndex != ObjectTypeEvent) &&
@@ -4093,7 +4090,7 @@ NTSTATUS supOpenNamedObjectByType(
         (TypeIndex != ObjectTypeSection) &&
         (TypeIndex != ObjectTypeSession))
     {
-        return STATUS_INVALID_PARAMETER_2;
+        return STATUS_NOT_SUPPORTED;
     }
 
     __try {
@@ -4102,12 +4099,6 @@ NTSTATUS supOpenNamedObjectByType(
         // Special ALPC port case.
         //
         if (TypeIndex == ObjectTypePort) {
-
-            //
-            // This case require object name.
-            //
-            if (ObjectName == NULL)
-                return STATUS_INVALID_PARAMETER_4;
 
             //
             // Build full object name.
@@ -4141,24 +4132,45 @@ NTSTATUS supOpenNamedObjectByType(
         }
 
         //
-        // Open object directory.
+        // Handle directory type.
+        //
+        if (TypeIndex == ObjectTypeDirectory) {
+
+            //
+            // If this is root, then root rootHandle = NULL.
+            //       
+            if (_strcmpi(ObjectName, KM_OBJECTS_ROOT_DIRECTORY) != 0) {
+
+                ntStatus = supOpenDirectoryForObject(&rootHandle, 
+                    ObjectName, 
+                    ObjectDirectory);
+
+                if (!NT_SUCCESS(ntStatus)) {
+                    return ntStatus;
+                }
+
+            }
+
+            //
+            // Open object in directory.
+            //
+            ntStatus = supOpenDirectory(&objectHandle, rootHandle, ObjectName, DesiredAccess);
+
+            if (rootHandle)
+                NtClose(rootHandle);
+
+            *ObjectHandle = objectHandle;
+            return ntStatus;
+        }
+
+        //
+        // Open directory which object belongs.
         //
         RtlInitUnicodeString(&ustr, ObjectDirectory);
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
-        ntStatus = NtOpenDirectoryObject(&rootHandle, DIRECTORY_QUERY, &obja);
-
-        if (!NT_SUCCESS(ntStatus))
-            return ntStatus;
-
-        //
-        // Directory open request, return handle.
-        //
-        if (ObjectName == NULL) {
-            *ObjectHandle = rootHandle;
-            return ntStatus;
-        }
-
+        supOpenDirectoryForObject(&rootHandle, ObjectName, ObjectDirectory);
+        
         RtlInitUnicodeString(&ustr, ObjectName);
         obja.RootDirectory = rootHandle;
 
@@ -4168,10 +4180,6 @@ NTSTATUS supOpenNamedObjectByType(
         switch (TypeIndex) {
         case ObjectTypeDevice:
             ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)supOpenDeviceObject;
-            break;
-
-        case ObjectTypeDirectory:
-            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)NtOpenDirectoryObject;
             break;
 
         case ObjectTypeMutant:
@@ -5260,14 +5268,14 @@ BOOL supGetListViewItemParam(
 }
 
 /*
-* supGetSidUseName
+* supGetSidNameUse
 *
 * Purpose:
 *
-* Translate SidUseName to string name.
+* Translate SidNameUse to string name.
 *
 */
-LPWSTR supGetSidUseName(
+LPWSTR supGetSidNameUse(
     _In_ SID_NAME_USE SidNameUse
 )
 {
@@ -6922,7 +6930,7 @@ VOID supQueryAlpcPortObjectTypeIndex(
     PWINOBJ_PORT_GLOBAL portGlobal = (PWINOBJ_PORT_GLOBAL)PortGlobal;
     NTSTATUS ntStatus;
     HANDLE portHandle = NULL;
-    UNICODE_STRING portName = RTL_CONSTANT_STRING(L"\\Rpc Control\\WinObjExPort");
+    UNICODE_STRING portName = RTL_CONSTANT_STRING(L"\\Rpc Control\\WinObjEx64Port");
     OBJECT_ATTRIBUTES objectAttributes;
     PSYSTEM_HANDLE_INFORMATION_EX pHandles = NULL;
 
@@ -7077,8 +7085,14 @@ NTSTATUS supQueryProcessImageFileNameWin32(
     return ntStatus;
 }
 
-//TBD
-//FIXME
+/*
+* supGetSidFromAce
+*
+* Purpose:
+*
+* Return Sid associated with Ace.
+*
+*/
 PSID supGetSidFromAce(
     _In_ PACE_HEADER AceHeader
 )
@@ -7100,4 +7114,30 @@ PSID supGetSidFromAce(
     }
 
     return &((PACCESS_ALLOWED_ACE)AceHeader)->SidStart;
+}
+
+/*
+* supQuerySecurityInformation
+*
+* Purpose:
+*
+* Query object security information with variable size.
+*
+* Returned buffer must be freed with supHeapFree after usage.
+*
+*/
+NTSTATUS supQuerySecurityInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ SECURITY_INFORMATION SecurityInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength)
+{
+    return ntsupQuerySystemObjectInformationVariableSize(
+        (PFN_NTQUERYROUTINE)NtQuerySecurityObject,
+        ObjectHandle,
+        (DWORD)SecurityInformationClass,
+        Buffer,
+        ReturnLength,
+        (PNTSUPMEMALLOC)supHeapAlloc,
+        (PNTSUPMEMFREE)supHeapFree);
 }

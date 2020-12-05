@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        01 Dec 2020
+*  DATE:        04 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -196,11 +196,11 @@ BOOL propOpenCurrentObject(
         //
         // If this is root, then root hDirectory = NULL.
         //
-        if (_strcmpi(Context->lpObjectName, L"\\") != 0) {
+        if (_strcmpi(Context->lpObjectName, KM_OBJECTS_ROOT_DIRECTORY) != 0) {
             //
             // Otherwise open directory that keep this object.
             //
-            hDirectory = supOpenDirectoryForObject(Context->lpObjectName, Context->lpCurrentObjectPath);
+            supOpenDirectoryForObject(&hDirectory, Context->lpObjectName, Context->lpCurrentObjectPath);
             if (hDirectory == NULL) {
                 SetLastError(ERROR_OBJECT_NOT_FOUND);
                 return bResult;
@@ -211,7 +211,14 @@ BOOL propOpenCurrentObject(
         // Open object in directory.
         //
 
-        hObject = supOpenDirectory(hDirectory, Context->lpObjectName, DesiredAccess);
+        status = supOpenDirectory(&hObject, hDirectory, 
+            Context->lpObjectName, 
+            DesiredAccess);
+
+        if (!NT_SUCCESS(status)) {
+            SetLastError(RtlNtStatusToDosError(status));
+        }
+
         bResult = (hObject != NULL);
 
         if (bResult) {
@@ -228,7 +235,7 @@ BOOL propOpenCurrentObject(
     //
     // Open directory which current object belongs.
     //
-    hDirectory = supOpenDirectoryForObject(Context->lpObjectName, Context->lpCurrentObjectPath);
+    supOpenDirectoryForObject(&hDirectory, Context->lpObjectName, Context->lpCurrentObjectPath);
     if (hDirectory == NULL) {
         SetLastError(ERROR_OBJECT_NOT_FOUND);
         return bResult;

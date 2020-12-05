@@ -554,9 +554,9 @@ VOID propSetProcessTrustLabelInfo(
         return;
     }
 
-    if (supQueryObjectTrustLabel(hObject,
+    if (NT_SUCCESS(supQueryObjectTrustLabel(hObject,
         &ProtectionType,
-        &ProtectionLevel))
+        &ProtectionLevel)))
     {
         szBuffer[0] = 0;
 

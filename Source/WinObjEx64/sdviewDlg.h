@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        04 Dec 2020
 *
 *  Common header file for the SecurityDescriptor View Dialog.
 *
@@ -29,5 +29,5 @@ typedef struct _SDVIEW_CONTEXT {
 VOID SDViewDialogCreate(
     _In_ HWND ParentWindow,
     _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName,
+    _In_ LPWSTR ObjectName,
     _In_ WOBJ_OBJECT_TYPE ObjectType);

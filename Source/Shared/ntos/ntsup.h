@@ -154,7 +154,8 @@ BOOL ntsupQueryThreadWin32StartAddress(
     _In_ HANDLE ThreadHandle,
     _Out_ PULONG_PTR Win32StartAddress);
 
-HANDLE ntsupOpenDirectory(
+NTSTATUS ntsupOpenDirectory(
+    _Out_ PHANDLE DirectoryHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
     _In_ LPWSTR DirectoryName,
     _In_ ACCESS_MASK DesiredAccess);

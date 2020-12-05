@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        23 July 2020
+*  DATE:        04 Dec 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -1722,7 +1722,7 @@ BOOL ObGetDirectoryObjectAddress(
         lpTarget = lpDirectory;
     }
 
-    hDirectory = supOpenDirectory(NULL, lpTarget, DIRECTORY_QUERY);
+    supOpenDirectory(&hDirectory, NULL, lpTarget, DIRECTORY_QUERY);
     if (hDirectory) {
 
         bFound = supQueryObjectFromHandle(hDirectory,

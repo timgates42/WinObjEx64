@@ -778,7 +778,8 @@ BOOL ntsupQueryThreadWin32StartAddress(
 * Open directory handle with DIRECTORY_QUERY access, with root directory support.
 *
 */
-HANDLE ntsupOpenDirectory(
+NTSTATUS ntsupOpenDirectory(
+    _Out_ PHANDLE DirectoryHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
     _In_ LPWSTR DirectoryName,
     _In_ ACCESS_MASK DesiredAccess
@@ -789,6 +790,8 @@ HANDLE ntsupOpenDirectory(
     UNICODE_STRING    usDirectory;
     OBJECT_ATTRIBUTES objectAttrbutes;
 
+    *DirectoryHandle = NULL;
+
     RtlInitUnicodeString(&usDirectory, DirectoryName);
     InitializeObjectAttributes(&objectAttrbutes,
         &usDirectory, OBJ_CASE_INSENSITIVE, RootDirectoryHandle, NULL);
@@ -797,14 +800,12 @@ HANDLE ntsupOpenDirectory(
         DesiredAccess,
         &objectAttrbutes);
 
-    if (!NT_SUCCESS(ntStatus)) {
-        RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
-        return NULL;
+    if (NT_SUCCESS(ntStatus)) {
+        *DirectoryHandle = directoryHandle;
     }
 
-    return directoryHandle;
+    return ntStatus;
 }
-
 
 /*
 * ntsupQueryProcessName

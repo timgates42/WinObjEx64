@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        01 Dec 2020
+*  DATE:        04 Dec 2020
 *
 *  Common header file for the program support routines.
 *
@@ -184,7 +184,6 @@ typedef struct tagVERHEAD {
 #define supQueryProcessEntryById ntsupQueryProcessEntryById
 #define supQueryProcessInformation ntsupQueryProcessInformation
 #define supQueryObjectInformation ntsupQueryObjectInformation
-#define supQuerySecurityInformation ntsupQuerySecurityInformation
 #define supWriteBufferToFile ntsupWriteBufferToFile
 #define supQueryHVCIState ntsupQueryHVCIState
 #define supLookupImageSectionByName ntsupLookupImageSectionByName
@@ -383,7 +382,8 @@ NTSTATUS supOpenDeviceObject(
     _In_ ACCESS_MASK DesiredAccess,
     _In_ POBJECT_ATTRIBUTES ObjectAttributes);
 
-HANDLE supOpenDirectoryForObject(
+NTSTATUS supOpenDirectoryForObject(
+    _Out_ PHANDLE DirectoryHandle,
     _In_ LPWSTR lpObjectName,
     _In_ LPWSTR lpDirectory);
 
@@ -430,7 +430,7 @@ HWINSTA supOpenWindowStationFromContext(
     _In_ BOOL fInherit,
     _In_ ACCESS_MASK dwDesiredAccess);
 
-BOOL supQueryObjectTrustLabel(
+NTSTATUS supQueryObjectTrustLabel(
     _In_ HANDLE hObject,
     _Out_ PULONG ProtectionType,
     _Out_ PULONG ProtectionLevel);
@@ -480,7 +480,7 @@ NTSTATUS supOpenNamedObjectByType(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
     _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName,
+    _In_ LPWSTR ObjectName,
     _In_ ACCESS_MASK DesiredAccess);
 
 HANDLE supOpenObjectFromContext(
@@ -559,7 +559,7 @@ BOOL WINAPI supCallbackShowChildWindow(
     _In_ HWND hwnd,
     _In_ LPARAM lParam);
 
-LPWSTR supGetSidUseName(
+LPWSTR supGetSidNameUse(
     _In_ SID_NAME_USE SidNameUse);
 
 LPWSTR supIntegrityToString(
@@ -735,3 +735,12 @@ NTSTATUS supOpenPortObjectFromContext(
 NTSTATUS supQueryProcessImageFileNameWin32(
     _In_ HANDLE UniqueProcessId,
     _Out_ PUNICODE_STRING* ProcessImageFileName);
+
+PSID supGetSidFromAce(
+    _In_ PACE_HEADER AceHeader);
+
+NTSTATUS supQuerySecurityInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ SECURITY_INFORMATION SecurityInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength);

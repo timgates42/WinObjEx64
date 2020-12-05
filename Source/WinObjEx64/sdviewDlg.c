@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        01 Dec 2020
+*  DATE:        04 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,14 +17,20 @@
 #include "global.h"
 #include "sdviewDlg.h"
 
-typedef VOID(CALLBACK* pfnGroupOutputCallback)(
+typedef VOID(CALLBACK* pfnSidOutputCallback)(
     _In_ SDVIEW_CONTEXT* Context,
     _In_ LPWSTR Information
     );
 
-typedef VOID(CALLBACK* pfnAclOutputCallback)(
-    _In_ SDVIEW_CONTEXT* Context
-    //TBD
+typedef VOID(CALLBACK* pfnAceOutputCallback)(
+    _In_ SDVIEW_CONTEXT* Context,
+    _In_ LPWSTR lpAceType,
+    _In_ LPWSTR lpAceFlags,
+    _In_ LPWSTR lpAccessMask,
+    _In_opt_ LPWSTR lpDomain,
+    _In_opt_ LPWSTR lpName,
+    _In_ LPWSTR lpSidNameUse,
+    _In_ PUNICODE_STRING SidString
     );
 
 VOID FreeSDViewContext(
@@ -86,105 +92,152 @@ SDVIEW_CONTEXT* AllocateSDViewContext(
     return ctx;
 }
 
-//TBD
-VOID SdViewShowNtError(
+VOID CALLBACK OutputSidCallback(
     _In_ SDVIEW_CONTEXT* Context,
-    _In_ NTSTATUS NtError
+    _In_ LPWSTR SidInformation
 )
 {
-    //FIXME
-    UNREFERENCED_PARAMETER(Context);
-    UNREFERENCED_PARAMETER(NtError);
+    SetDlgItemText(Context->DialogWindow, IDC_SDVIEW_OWNER, SidInformation);
 }
 
-//TBD
+VOID CALLBACK OutputAclEntryCallback(
+    _In_ SDVIEW_CONTEXT* Context,
+    _In_ LPWSTR lpAceType,
+    _In_ LPWSTR lpAceFlags,
+    _In_ LPWSTR lpAccessMask,
+    _In_opt_ LPWSTR lpDomain,
+    _In_opt_ LPWSTR lpName,
+    _In_ LPWSTR lpSidNameUse,
+    _In_ PUNICODE_STRING SidString
+)
+{
+    INT lvItemIndex;
+    HWND hwndList = GetDlgItem(Context->DialogWindow, IDC_SDVIEW_LIST);
+
+    LVITEM lvItem;
+    WCHAR szBuffer[1040];
+
+
+    RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
+
+    //
+    // Ace type.
+    //
+    lvItem.mask = LVIF_TEXT;
+    lvItem.iItem = MAXINT;
+    lvItem.iImage = I_IMAGENONE;
+    lvItem.pszText = lpAceType;
+    lvItem.cchTextMax = (INT)_strlen(lpAceType);
+    lvItemIndex = ListView_InsertItem(hwndList, &lvItem);
+
+    //
+    // Ace flags.
+    //
+    lvItem.pszText = lpAceFlags;
+    lvItem.cchTextMax = (INT)_strlen(lpAceFlags);
+    lvItem.iItem = lvItemIndex;
+    ++lvItem.iSubItem;
+    ListView_SetItem(hwndList, &lvItem);
+
+    //
+    // Acess mask.
+    //
+    lvItem.pszText = lpAccessMask;
+    lvItem.cchTextMax = (INT)_strlen(lpAccessMask);
+    ++lvItem.iSubItem;
+    ListView_SetItem(hwndList, &lvItem);
+
+    //
+    // SID.
+    //
+    RtlStringCchPrintfSecure(szBuffer,
+        RTL_NUMBER_OF(szBuffer),
+        L"%wZ",
+        SidString);
+
+    lvItem.pszText = szBuffer;
+    lvItem.cchTextMax = (INT)_strlen(szBuffer);
+    ++lvItem.iSubItem;
+    ListView_SetItem(hwndList, &lvItem);
+
+    //
+    // Domain and Name
+    //
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    if (lpDomain) {
+        _strcpy(szBuffer, lpDomain);
+        if (lpName) {
+            _strcat(szBuffer, TEXT("\\"));
+            _strcat(szBuffer, lpName);
+        }
+    }
+    else {
+        if (lpName)
+            _strcpy(szBuffer, lpName);
+    }
+
+    lvItem.pszText = szBuffer;
+    lvItem.cchTextMax = (INT)_strlen(szBuffer);
+    ++lvItem.iSubItem;
+    ListView_SetItem(hwndList, &lvItem);
+
+    //
+    // Alias.
+    //
+    lvItem.pszText = lpSidNameUse;
+    lvItem.cchTextMax = (INT)_strlen(lpSidNameUse);
+    ++lvItem.iSubItem;
+    ListView_SetItem(hwndList, &lvItem);
+}
+
+/*
+* SdViewDumpAceList
+*
+* Purpose:
+*
+* Output ACE list members.
+*
+*/
 VOID SdViewDumpAceList(
     _In_ SDVIEW_CONTEXT* Context,
     _In_ ULONG AceCount,
     _In_ PVOID FirstAce,
-    _In_ LSA_HANDLE PolicyHandle
-)
-{
-//FIXME
-    UNREFERENCED_PARAMETER(Context);
-    UNREFERENCED_PARAMETER(AceCount);
-    UNREFERENCED_PARAMETER(FirstAce);
-    UNREFERENCED_PARAMETER(PolicyHandle);
-}
-
-//TBD
-VOID SdViewDumpAcl(
-    _In_ SDVIEW_CONTEXT* Context,
-    _In_opt_ PACL Acl,
-    _In_ LSA_HANDLE PolicyHandle
-)
-{
-    PVOID firstAce = NULL;
-
-    //FIXME
-    UNREFERENCED_PARAMETER(Context);
-    UNREFERENCED_PARAMETER(PolicyHandle);
-
-    if (Acl == NULL) {
-
-
-    }
-    else {
-
-        if (Acl->AceCount == 0) {
-
-
-
-        }
-        else {
-
-            if (NT_SUCCESS(RtlGetAce(Acl, 0, &firstAce))) {
-
-                SdViewDumpAceList(Context, Acl->AceCount, firstAce, PolicyHandle);
-
-            }
-
-        }
-
-    }
-}
-
-VOID SdViewDumpTokenGroups(
-    _In_ SDVIEW_CONTEXT* Context,
-    _In_ PTOKEN_GROUPS TokenGroups,
     _In_ LSA_HANDLE PolicyHandle,
-    _In_ pfnGroupOutputCallback OutputCallback
+    _In_ pfnAceOutputCallback OutputCallback
 )
 {
-    ULONG groupCount, domainIndex, i, groupAttributes;
+    ULONG domainIndex, nCount, domainsEntries = 0;
     NTSTATUS ntStatus;
-    PSID_AND_ATTRIBUTES tokenGroups = NULL;
-    PLSA_TRANSLATED_NAME translatedNames = NULL, pNames;
+    BOOL bDomainNamePresent = FALSE, bNamePresent = FALSE;
+
+    PLSA_TRANSLATED_NAME translatedNames = NULL, pNames = NULL;
     PLSA_REFERENCED_DOMAIN_LIST referencedDomains = NULL;
     PUNICODE_STRING pusDomainName, pusName;
     PSID* lookupSids;
-    LPWSTR pSidNameUseString = NULL;
+    PSID aceSid;
+    ULONG sidCount = 0;
+    ACCESS_MASK accessMask;
 
     UNICODE_STRING stringSid, usEmpty;
 
     SID_NAME_USE sidNameUse;
 
-    WCHAR szBuffer[512];
-    WCHAR szAttrList[10];
+    WCHAR szDomain[512], szName[512];
+    WCHAR szAccessMask[32], szAceType[32], szAceFlags[32];
+    LPWSTR lpAceType;
 
-    //
-    // Do we have anything to show?
-    //
-    if (!TokenGroups->GroupCount)
-        return;
+    union {
+        PBYTE ListRef;
+        PACE_HEADER Header;
+        PACCESS_ALLOWED_ACE AccessAllowed;
+    } aceList;
 
-    tokenGroups = TokenGroups->Groups;
-    groupCount = TokenGroups->GroupCount;
+    aceList.ListRef = (PBYTE)FirstAce;
 
     //
     // Allocate array of sids for LsaLookupSids.
     //
-    lookupSids = (PSID*)supHeapAlloc(groupCount * sizeof(PSID));
+    lookupSids = (PSID*)supHeapAlloc(AceCount * sizeof(PSID));
     if (lookupSids == NULL)
         return;
 
@@ -193,49 +246,76 @@ VOID SdViewDumpTokenGroups(
         //
         // Fill sids array for LsaLookupSids.
         //
-        for (i = 0; i < groupCount; i++, tokenGroups++)
-            lookupSids[i] = tokenGroups->Sid;
+        nCount = AceCount;
 
+        do {
+
+            aceSid = supGetSidFromAce(aceList.Header);
+
+            if (RtlValidSid(aceSid)) {
+                lookupSids[sidCount++] = aceSid;
+            }
+
+            aceList.ListRef += aceList.Header->AceSize;
+
+        } while (--nCount);
+
+        //
+        // Lookup sids.
+        //
         ntStatus = LsaLookupSids(PolicyHandle,
-            groupCount,
+            sidCount,
             lookupSids,
             &referencedDomains,
             &translatedNames);
 
-        if (!NT_SUCCESS(ntStatus)) {
-            __leave;
+        if (NT_SUCCESS(ntStatus)) {
+
+            pNames = translatedNames;
+            domainsEntries = referencedDomains->Entries;
+
         }
 
-        pNames = translatedNames;
-        tokenGroups = TokenGroups->Groups;
+        aceList.ListRef = (PBYTE)FirstAce;
+        nCount = AceCount;
 
         RtlInitEmptyUnicodeString(&stringSid, NULL, 0);
         RtlInitEmptyUnicodeString(&usEmpty, NULL, 0);
 
-        for (i = 0; i < groupCount; i++, tokenGroups++) {
+        //
+        // List aces.
+        //
+
+        do {
+
+            aceSid = supGetSidFromAce(aceList.Header);
+            if (!RtlValidSid(aceSid)) {
+                continue;
+            }
 
             //
             // Convert SID to string, on failure zero result so RtlFreeUnicodeString won't fuckup.
             //
             if (!NT_SUCCESS(RtlConvertSidToUnicodeString(&stringSid,
-                tokenGroups->Sid,
+                aceSid,
                 TRUE)))
             {
                 stringSid.Buffer = NULL;
                 stringSid.Length = 0;
             }
 
+            sidNameUse = SidTypeUnknown;
             pusDomainName = &usEmpty;
             pusName = &usEmpty;
-            sidNameUse = SidTypeUnknown;
 
             //
             // Link domain, name and sid name use.
             //
+
             if (pNames) {
 
                 domainIndex = pNames->DomainIndex;
-                if (domainIndex < referencedDomains->Entries)
+                if (domainIndex < domainsEntries)
                     pusDomainName = &referencedDomains->Domains[domainIndex].Name;
 
                 pusName = &pNames->Name;
@@ -244,96 +324,110 @@ VOID SdViewDumpTokenGroups(
 
             }
 
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            pSidNameUseString = supGetSidUseName(sidNameUse);
+            bDomainNamePresent = (pusDomainName->Length > 0);
+            bNamePresent = (pusName->Length > 0);
 
-            groupAttributes = tokenGroups->Attributes;
-            if (groupAttributes) {
+            accessMask = aceList.AccessAllowed->Mask;
 
+            szAccessMask[0] = L'0';
+            szAccessMask[1] = L'x';
+            szAccessMask[2] = 0;
+            ultohex((ULONG)accessMask, &szAccessMask[2]);
+
+            szAceFlags[0] = L'0';
+            szAceFlags[1] = L'x';
+            szAceFlags[2] = 0;
+            ultohex((ULONG)aceList.Header->AceFlags, &szAceFlags[2]);
+
+            switch (aceList.Header->AceType) {
+
+            case ACCESS_ALLOWED_ACE_TYPE:
+                lpAceType = L"Allowed";
+                break;
+
+            case ACCESS_DENIED_ACE_TYPE:
+                lpAceType = L"Denied";
+                break;
+
+            case SYSTEM_MANDATORY_LABEL_ACE_TYPE:
+                lpAceType = L"Mandatory";
+                szAccessMask[0] = accessMask & SYSTEM_MANDATORY_LABEL_NO_READ_UP ? L'R' : L' ';
+                szAccessMask[1] = accessMask & SYSTEM_MANDATORY_LABEL_NO_WRITE_UP ? L'W' : L' ';
+                szAccessMask[2] = accessMask & SYSTEM_MANDATORY_LABEL_NO_EXECUTE_UP ? L'E' : L' ';
+                szAccessMask[3] = 0;
+                break;
+
+            case SYSTEM_PROCESS_TRUST_LABEL_ACE_TYPE:
+                lpAceType = L"TrustLabel";
+                break;
+
+            case SYSTEM_ACCESS_FILTER_ACE_TYPE:
+                lpAceType = L"AccessFilter";
+                break;
+
+            default:
                 //
-                // Dump group attributes.
+                // Irrelevant, report as is.
                 //
-                szAttrList[0] = groupAttributes & SE_GROUP_MANDATORY ? L'M' : L' ';
-                szAttrList[1] = groupAttributes & SE_GROUP_ENABLED ? L'E' : L' ';
-                szAttrList[2] = groupAttributes & SE_GROUP_ENABLED_BY_DEFAULT ? L'+' : L' ';
-                szAttrList[3] = groupAttributes & SE_GROUP_OWNER ? L'O' : L' ';
-                szAttrList[4] = groupAttributes & SE_GROUP_USE_FOR_DENY_ONLY ? L'D' : L' ';
-                szAttrList[5] = groupAttributes & SE_GROUP_INTEGRITY ? L'I' : L' ';
-                szAttrList[6] = groupAttributes & SE_GROUP_INTEGRITY_ENABLED ? L'+' : L' ';
-                szAttrList[7] = groupAttributes & SE_GROUP_LOGON_ID ? L'L' : L' ';
-                szAttrList[8] = groupAttributes & SE_GROUP_RESOURCE ? L'R' : L' ';
-                szAttrList[9] = 0;
+                szAceType[0] = L'0';
+                szAceType[1] = L'x';
+                szAceType[2] = 0;
+                ultohex((ULONG)aceList.Header->AceType, &szAceType[2]);
+                lpAceType = (LPWSTR)&szAceType;
+                break;
+            }
 
+            //
+            // Domain and name.
+            //
+            RtlSecureZeroMemory(&szDomain, sizeof(szDomain));
+            szDomain[0] = 0;
+            RtlSecureZeroMemory(&szName, sizeof(szName));
+            szName[0] = 0;
+
+            switch (sidNameUse) {
+            case SidTypeInvalid:
+            case SidTypeUnknown:
                 //
-                // Dump sid name use.
+                // Invalid or unknown, skip domain and name.
                 //
-                switch (sidNameUse) {
+                break;
 
-                case SidTypeInvalid:
-                case SidTypeUnknown:
+            default:
 
-                    RtlStringCchPrintfSecure(szBuffer,
-                        RTL_NUMBER_OF(szBuffer),
-                        TEXT("0x%08X %wS [%wZ] [%wS]"),
-                        groupAttributes,
-                        szAttrList,
-                        &stringSid,
-                        pSidNameUseString);
+                if (bNamePresent) {
 
-                    break;
+                    RtlStringCchPrintfSecure(szName,
+                        RTL_NUMBER_OF(szName),
+                        L"%wZ",
+                        pusName);
 
-                default:
-
-                    RtlStringCchPrintfSecure(szBuffer,
-                        RTL_NUMBER_OF(szBuffer),
-                        TEXT(" 0x%08X %wS [%wZ] '%wZ\\%wZ' [%wS]"),
-                        groupAttributes,
-                        szAttrList,
-                        &stringSid,
-                        pusDomainName,
-                        pusName,
-                        pSidNameUseString);
-
-                    break;
                 }
 
-            }
-            else {
+                if (bDomainNamePresent) {
 
+                    RtlStringCchPrintfSecure(szDomain,
+                        RTL_NUMBER_OF(szDomain),
+                        L"%wZ",
+                        pusDomainName);
 
-                //
-                // Dump sid name use.
-                //
-                switch (sidNameUse) {
-                case SidTypeInvalid:
-                case SidTypeUnknown:
-
-                    RtlStringCchPrintfSecure(szBuffer,
-                        RTL_NUMBER_OF(szBuffer),
-                        TEXT("[%wZ] [%wS]"),
-                        &stringSid,
-                        pSidNameUseString);
-
-                    break;
-
-                default:
-
-                    RtlStringCchPrintfSecure(szBuffer,
-                        RTL_NUMBER_OF(szBuffer),
-                        TEXT("[%wZ] '%wZ\\%wZ' [%wS]"),
-                        &stringSid,
-                        pusDomainName,
-                        pusName,
-                        pSidNameUseString);
-
-                    break;
                 }
 
+                break;
             }
+
+            OutputCallback(Context,
+                lpAceType,
+                szAceFlags,
+                szAccessMask,
+                bDomainNamePresent ? szDomain : NULL,
+                bNamePresent ? szName : NULL,
+                supGetSidNameUse(sidNameUse),
+                &stringSid);
 
             RtlFreeUnicodeString(&stringSid);
-            OutputCallback(Context, szBuffer);
-        }
+
+        } while (aceList.ListRef += aceList.Header->AceSize, --nCount);
 
     }
     __finally {
@@ -341,14 +435,43 @@ VOID SdViewDumpTokenGroups(
         if (referencedDomains) LsaFreeMemory(referencedDomains);
         if (translatedNames) LsaFreeMemory(translatedNames);
     }
+
 }
 
-VOID CALLBACK SdViewOutputSidCallback(
+/*
+* SdViewDumpAcl
+*
+* Purpose:
+*
+* Output ACL information.
+*
+*/
+VOID SdViewDumpAcl(
     _In_ SDVIEW_CONTEXT* Context,
-    _In_ LPWSTR SidInformation
+    _In_opt_ PACL Acl,
+    _In_ LSA_HANDLE PolicyHandle,
+    _In_ pfnAceOutputCallback OutputCallback
 )
 {
-    SetDlgItemText(Context->DialogWindow, IDC_SDVIEW_OWNER, SidInformation);
+    PVOID firstAce = NULL;
+
+    if (Acl == NULL) {
+        return;
+    }
+
+    if (Acl->AceCount == 0) {
+        return;
+    }
+
+    if (NT_SUCCESS(RtlGetAce(Acl, 0, &firstAce))) {
+
+        SdViewDumpAceList(Context,
+            Acl->AceCount,
+            firstAce,
+            PolicyHandle,
+            OutputCallback);
+
+    }
 }
 
 /*
@@ -362,16 +485,117 @@ VOID CALLBACK SdViewOutputSidCallback(
 VOID SdViewDumpSid(
     _In_ SDVIEW_CONTEXT* Context,
     _In_ PSID Sid,
-    _In_ LSA_HANDLE PolicyHandle
+    _In_ LSA_HANDLE PolicyHandle,
+    _In_ pfnSidOutputCallback OutputCallback
 )
 {
-    TOKEN_GROUPS tkGroups;
+    ULONG domainIndex, domainsEntries;
+    NTSTATUS ntStatus;
+    PLSA_TRANSLATED_NAME translatedNames = NULL, pNames;
+    PLSA_REFERENCED_DOMAIN_LIST referencedDomains = NULL;
+    PUNICODE_STRING pusDomainName, pusName;
+    LPWSTR pSidNameUseString = NULL;
 
-    tkGroups.GroupCount = 1;
-    tkGroups.Groups[0].Attributes = 0;
-    tkGroups.Groups[0].Sid = Sid;
+    UNICODE_STRING stringSid, usEmpty;
 
-    SdViewDumpTokenGroups(Context, &tkGroups, PolicyHandle, &SdViewOutputSidCallback);
+    SID_NAME_USE sidNameUse;
+
+    WCHAR szBuffer[512];
+
+    //
+    // Do we have anything to show?
+    //
+    if (!RtlValidSid(Sid))
+        return;
+
+    __try {
+
+        pNames = NULL;
+        domainsEntries = 0;
+
+        ntStatus = LsaLookupSids(PolicyHandle,
+            1,
+            &Sid,
+            &referencedDomains,
+            &translatedNames);
+
+        if (NT_SUCCESS(ntStatus)) {
+            pNames = translatedNames;
+            domainsEntries = referencedDomains->Entries;
+        }
+
+        RtlInitEmptyUnicodeString(&stringSid, NULL, 0);
+        RtlInitEmptyUnicodeString(&usEmpty, NULL, 0);
+
+        //
+        // Convert SID to string, on failure zero result so RtlFreeUnicodeString won't fuckup.
+        //
+        if (!NT_SUCCESS(RtlConvertSidToUnicodeString(&stringSid,
+            Sid,
+            TRUE)))
+        {
+            stringSid.Buffer = NULL;
+            stringSid.Length = 0;
+        }
+
+        sidNameUse = SidTypeUnknown;
+        pusDomainName = &usEmpty;
+        pusName = &usEmpty;
+
+        //
+        // Link domain, name and sid name use.
+        //
+        if (pNames) {
+
+            domainIndex = pNames->DomainIndex;
+            if (domainIndex < domainsEntries)
+                pusDomainName = &referencedDomains->Domains[domainIndex].Name;
+
+            pusName = &pNames->Name;
+            sidNameUse = pNames->Use;
+            pNames++;
+
+        }
+
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        pSidNameUseString = supGetSidNameUse(sidNameUse);
+
+        //
+        // Dump sid name use.
+        //
+        switch (sidNameUse) {
+        case SidTypeInvalid:
+        case SidTypeUnknown:
+
+            RtlStringCchPrintfSecure(szBuffer,
+                RTL_NUMBER_OF(szBuffer),
+                TEXT("[%wZ] [%wS]"),
+                &stringSid,
+                pSidNameUseString);
+
+            break;
+
+        default:
+
+            RtlStringCchPrintfSecure(szBuffer,
+                RTL_NUMBER_OF(szBuffer),
+                TEXT("[%wZ] '%wZ\\%wZ' [%wS]"),
+                &stringSid,
+                pusDomainName,
+                pusName,
+                pSidNameUseString);
+
+            break;
+        }
+
+        RtlFreeUnicodeString(&stringSid);
+        OutputCallback(Context, szBuffer);
+
+    }
+    __finally {
+        if (referencedDomains) LsaFreeMemory(referencedDomains);
+        if (translatedNames) LsaFreeMemory(translatedNames);
+    }
 }
 
 /*
@@ -419,9 +643,7 @@ NTSTATUS SdViewDumpObjectSecurity(
             OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION |
             LABEL_SECURITY_INFORMATION | PROCESS_TRUST_LABEL_SECURITY_INFORMATION,
             &pSD,
-            NULL,
-            (PNTSUPMEMALLOC)supHeapAlloc,
-            (PNTSUPMEMFREE)supHeapFree);
+            NULL);
 
         if (!NT_SUCCESS(ntStatus))
             __leave;
@@ -431,7 +653,7 @@ NTSTATUS SdViewDumpObjectSecurity(
         ntQueryStatus = RtlGetOwnerSecurityDescriptor(pSD, &pOwnerSid, &bDefaulted);
         if (NT_SUCCESS(ntQueryStatus)) {
 
-            SdViewDumpSid(Context, pOwnerSid, hPolicy);
+            SdViewDumpSid(Context, pOwnerSid, hPolicy, &OutputSidCallback);
 
         }
 
@@ -439,7 +661,7 @@ NTSTATUS SdViewDumpObjectSecurity(
         ntQueryStatus = RtlGetDaclSecurityDescriptor(pSD, &bPresent, &pAcl, &bDefaulted);
         if (NT_SUCCESS(ntQueryStatus)) {
 
-            SdViewDumpAcl(Context, pAcl, hPolicy);
+            SdViewDumpAcl(Context, pAcl, hPolicy, &OutputAclEntryCallback);
 
         }
 
@@ -447,7 +669,7 @@ NTSTATUS SdViewDumpObjectSecurity(
         ntQueryStatus = RtlGetSaclSecurityDescriptor(pSD, &bPresent, &pAcl, &bDefaulted);
         if (NT_SUCCESS(ntQueryStatus)) {
 
-            SdViewDumpAcl(Context, pAcl, hPolicy);
+            SdViewDumpAcl(Context, pAcl, hPolicy, &OutputAclEntryCallback);
 
         }
 
@@ -473,40 +695,44 @@ VOID SDViewInitControls(
     _In_ HWND hwndDlg
 )
 {
+    struct LVColumns {
+        LPWSTR Name;
+        INT Width;
+        INT Format;
+    } columnData[] =
+    {
+        { L"Type", 80, LVCFMT_CENTER },
+        { L"Flags", 80, LVCFMT_CENTER },
+        { L"AccessMask", 120, LVCFMT_CENTER },
+        { L"SID", 120, LVCFMT_LEFT },
+        { L"Domain\\Name", 200, LVCFMT_LEFT },
+        { L"UseName", 120, LVCFMT_LEFT }
+    };
+
+    INT i;
     HWND aclList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
     HWND sidOwner = GetDlgItem(hwndDlg, IDC_SDVIEW_OWNER);
+    DWORD dwStyle = LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP;
 
-    ListView_SetExtendedListViewStyle(aclList,
-        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
+    if (g_WinObj.ListViewDisplayGrid)
+        dwStyle |= LVS_EX_GRIDLINES;
 
-    SendMessage(aclList, LVM_ENABLEGROUPVIEW, 1, 0);
+    ListView_SetExtendedListViewStyle(aclList, dwStyle);
+
+    // SendMessage(aclList, LVM_ENABLEGROUPVIEW, 1, 0);
 
     SetWindowTheme(aclList, TEXT("Explorer"), NULL);
 
-    supAddListViewColumn(aclList, 0, 0, 0,
-        I_IMAGENONE,
-        LVCFMT_LEFT,
-        TEXT("Type"), 80);
+    for (i = 0; i < RTL_NUMBER_OF(columnData); i++) {
 
-    supAddListViewColumn(aclList, 1, 1, 1,
-        I_IMAGENONE,
-        LVCFMT_LEFT,
-        TEXT("Flags"), 80);
-
-    supAddListViewColumn(aclList, 2, 2, 2,
-        I_IMAGENONE,
-        LVCFMT_LEFT,
-        TEXT("AccessMask"), 120);
-
-    supAddListViewColumn(aclList, 3, 3, 3,
-        I_IMAGENONE,
-        LVCFMT_LEFT,
-        TEXT("SID"), 400);
-
+        supAddListViewColumn(aclList, i, i, i,
+            I_IMAGENONE,
+            columnData[i].Format,
+            columnData[i].Name,
+            columnData[i].Width);
+    }
 
     SetWindowText(sidOwner, T_EmptyString);
-
-    //FIXME
 }
 
 /*
@@ -578,7 +804,7 @@ INT_PTR CALLBACK SDViewDialogProc(
 VOID SDViewDialogCreate(
     _In_ HWND ParentWindow,
     _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName,
+    _In_ LPWSTR ObjectName,
     _In_ WOBJ_OBJECT_TYPE ObjectType
 )
 {
@@ -587,12 +813,12 @@ VOID SDViewDialogCreate(
     NTSTATUS ntStatus;
     SDVIEW_CONTEXT* SDViewContext;
 
-    LPWSTR lpCaption;
-    SIZE_T nLen;
+    LPWSTR lpText;
+//    SIZE_T nLen;
 
     ENUMCHILDWNDDATA wndData;
 
-    if (ObjectDirectory == NULL)
+    if (ObjectDirectory == NULL || ObjectName == NULL)
         return;
 
     SDViewContext = AllocateSDViewContext(ObjectDirectory,
@@ -609,23 +835,7 @@ VOID SDViewDialogCreate(
         (LPARAM)SDViewContext);
 
     if (hwndDlg) {
-
-        nLen = MAX_PATH + _strlen(SDViewContext->Name) +
-            _strlen(SDViewContext->Directory);
-
-        lpCaption = (LPWSTR)supHeapAlloc(nLen * sizeof(WCHAR));
-        if (lpCaption) {
-
-            _strcpy(lpCaption, SDViewContext->Directory);
-            if (SDViewContext->Name) {
-                if (_strcmpi(SDViewContext->Directory, KM_OBJECTS_ROOT_DIRECTORY) != 0)
-                    _strcat(lpCaption, TEXT("\\"));
-                _strcat(lpCaption, SDViewContext->Name);
-            }
-            _strcat(lpCaption, TEXT(" Security Descriptor"));
-            SetWindowText(hwndDlg, lpCaption);
-            supHeapFree(lpCaption);
-        }
+        SetWindowText(hwndDlg, TEXT("Security Descriptor"));
 
         //
         // Set dialog icon.
@@ -660,10 +870,10 @@ VOID SDViewDialogCreate(
                 EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&wndData);
             }
             ShowWindow(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), SW_SHOW);
-            lpCaption = supFormatNtError(ntStatus);
-            if (lpCaption) {
-                SetDlgItemText(hwndDlg, ID_OBJECTDUMPERROR, lpCaption);
-                LocalFree((HLOCAL)lpCaption);
+            lpText = supFormatNtError(ntStatus);
+            if (lpText) {
+                SetDlgItemText(hwndDlg, ID_OBJECTDUMPERROR, lpText);
+                LocalFree((HLOCAL)lpText);
             }
         }
     }
