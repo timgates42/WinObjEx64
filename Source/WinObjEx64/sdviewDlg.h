@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
 *  TITLE:       SDVIEWDLG.H
 *
 *  VERSION:     1.88
 *
-*  DATE:        04 Dec 2020
+*  DATE:        05 Dec 2020
 *
 *  Common header file for the SecurityDescriptor View Dialog.
 *
@@ -17,14 +17,6 @@
 *
 *******************************************************************************/
 #pragma once
-
-typedef struct _SDVIEW_CONTEXT {
-    HWND DialogWindow;
-    HICON DialogIcon;
-    LPWSTR Directory;
-    LPWSTR Name;
-    WOBJ_OBJECT_TYPE Type;
-} SDVIEW_CONTEXT, * PSDVIEW_CONTEXT;
 
 VOID SDViewDialogCreate(
     _In_ HWND ParentWindow,

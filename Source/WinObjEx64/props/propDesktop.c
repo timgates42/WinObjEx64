@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.88
 *
-*  DATE:        26 May 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -232,18 +232,21 @@ VOID DesktopListCreate(
             DestroyIcon(hImage);
         }
 
-        ListView_SetImageList(pDlgContext->ListView, pDlgContext->ImageList, LVSIL_SMALL);
     }
 
-    ListView_SetExtendedListViewStyle(pDlgContext->ListView,
-        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-    SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
+    //
+    // Set listview imagelist, style flags and theme.
+    //
+    supSetListViewSettings(pDlgContext->ListView,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        FALSE,
+        TRUE,
+        pDlgContext->ImageList,
+        LVSIL_SMALL);
 
     //
     // Add listview columns.
     //
-
     supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
         2,
         LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,

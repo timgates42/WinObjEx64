@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        04 Dec 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,22 +17,74 @@
 #include "global.h"
 #include "sdviewDlg.h"
 
+//
+// SDView Dialog context structure.
+//
+
+typedef struct _SDVIEW_CONTEXT {
+    //
+    // Dialog controls and resources.
+    //
+    HWND DialogWindow;
+    HWND StatusBar;
+    HWND AceList;
+    HICON DialogIcon;
+
+    //
+    // Viewed object data.
+    //
+    LPWSTR Directory;
+    LPWSTR Name;
+    WOBJ_OBJECT_TYPE Type;
+
+    //
+    // ListView selection.
+    //
+    INT iSelectedItem;
+    INT iColumnHit;
+
+    //
+    // Window controls layout.
+    //
+    RECT WindowRect;
+    RECT ListRect;
+    RECT ButtonRect;
+} SDVIEW_CONTEXT, * PSDVIEW_CONTEXT;
+
+//
+// Ace list dump callback data structure.
+//
+
+typedef struct _ACE_DUMP_ENTRY {
+    _In_ LPWSTR lpAceType;
+    _In_ LPWSTR lpAceFlags;
+    _In_ LPWSTR lpAccessMask;
+    _In_opt_ LPWSTR lpDomain;
+    _In_opt_ LPWSTR lpName;
+    _In_ LPWSTR lpSidNameUse;
+    _In_ PUNICODE_STRING SidString;
+} ACE_DUMP_ENTRY, * PACE_DUMP_ENTRY;
+
 typedef VOID(CALLBACK* pfnSidOutputCallback)(
     _In_ SDVIEW_CONTEXT* Context,
-    _In_ LPWSTR Information
+    _In_ LPWSTR Information,
+    _In_opt_ PVOID CallbackContext
     );
 
 typedef VOID(CALLBACK* pfnAceOutputCallback)(
     _In_ SDVIEW_CONTEXT* Context,
-    _In_ LPWSTR lpAceType,
-    _In_ LPWSTR lpAceFlags,
-    _In_ LPWSTR lpAccessMask,
-    _In_opt_ LPWSTR lpDomain,
-    _In_opt_ LPWSTR lpName,
-    _In_ LPWSTR lpSidNameUse,
-    _In_ PUNICODE_STRING SidString
+    _In_ PACE_DUMP_ENTRY Entry,
+    _In_opt_ PVOID CallbackContext
     );
 
+/*
+* FreeSDViewContext
+*
+* Purpose:
+*
+* Free memory allocated for per-dialog context structure.
+*
+*/
 VOID FreeSDViewContext(
     _In_ SDVIEW_CONTEXT* SdViewContext
 )
@@ -45,6 +97,14 @@ VOID FreeSDViewContext(
     supHeapFree(SdViewContext);
 }
 
+/*
+* AllocateSDViewContext
+*
+* Purpose:
+*
+* Allocate memory for per-dialog context structure and fill it.
+*
+*/
 SDVIEW_CONTEXT* AllocateSDViewContext(
     _In_ LPWSTR ObjectDirectory,
     _In_opt_ LPWSTR ObjectName,
@@ -92,23 +152,22 @@ SDVIEW_CONTEXT* AllocateSDViewContext(
     return ctx;
 }
 
+//FIXME
 VOID CALLBACK OutputSidCallback(
     _In_ SDVIEW_CONTEXT* Context,
-    _In_ LPWSTR SidInformation
+    _In_ LPWSTR SidInformation,
+    _In_opt_ PVOID CallbackContext
 )
 {
+    UNREFERENCED_PARAMETER(CallbackContext);
+
     SetDlgItemText(Context->DialogWindow, IDC_SDVIEW_OWNER, SidInformation);
 }
 
 VOID CALLBACK OutputAclEntryCallback(
     _In_ SDVIEW_CONTEXT* Context,
-    _In_ LPWSTR lpAceType,
-    _In_ LPWSTR lpAceFlags,
-    _In_ LPWSTR lpAccessMask,
-    _In_opt_ LPWSTR lpDomain,
-    _In_opt_ LPWSTR lpName,
-    _In_ LPWSTR lpSidNameUse,
-    _In_ PUNICODE_STRING SidString
+    _In_ PACE_DUMP_ENTRY Entry,
+    _In_ PVOID CallbackContext
 )
 {
     INT lvItemIndex;
@@ -123,18 +182,21 @@ VOID CALLBACK OutputAclEntryCallback(
     //
     // Ace type.
     //
-    lvItem.mask = LVIF_TEXT;
+    lvItem.mask = LVIF_TEXT | LVIF_GROUPID;
     lvItem.iItem = MAXINT;
     lvItem.iImage = I_IMAGENONE;
-    lvItem.pszText = lpAceType;
-    lvItem.cchTextMax = (INT)_strlen(lpAceType);
+    lvItem.iGroupId = PtrToInt(CallbackContext);
+    lvItem.pszText = Entry->lpAceType;
+    lvItem.cchTextMax = (INT)_strlen(lvItem.pszText);
     lvItemIndex = ListView_InsertItem(hwndList, &lvItem);
+
+    lvItem.mask = LVIF_TEXT;
 
     //
     // Ace flags.
     //
-    lvItem.pszText = lpAceFlags;
-    lvItem.cchTextMax = (INT)_strlen(lpAceFlags);
+    lvItem.pszText = Entry->lpAceFlags;
+    lvItem.cchTextMax = (INT)_strlen(lvItem.pszText);
     lvItem.iItem = lvItemIndex;
     ++lvItem.iSubItem;
     ListView_SetItem(hwndList, &lvItem);
@@ -142,8 +204,8 @@ VOID CALLBACK OutputAclEntryCallback(
     //
     // Acess mask.
     //
-    lvItem.pszText = lpAccessMask;
-    lvItem.cchTextMax = (INT)_strlen(lpAccessMask);
+    lvItem.pszText = Entry->lpAccessMask;
+    lvItem.cchTextMax = (INT)_strlen(lvItem.pszText);
     ++lvItem.iSubItem;
     ListView_SetItem(hwndList, &lvItem);
 
@@ -153,7 +215,7 @@ VOID CALLBACK OutputAclEntryCallback(
     RtlStringCchPrintfSecure(szBuffer,
         RTL_NUMBER_OF(szBuffer),
         L"%wZ",
-        SidString);
+        Entry->SidString);
 
     lvItem.pszText = szBuffer;
     lvItem.cchTextMax = (INT)_strlen(szBuffer);
@@ -164,16 +226,18 @@ VOID CALLBACK OutputAclEntryCallback(
     // Domain and Name
     //
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    if (lpDomain) {
-        _strcpy(szBuffer, lpDomain);
-        if (lpName) {
+    if (Entry->lpDomain) {
+        _strcpy(szBuffer, Entry->lpDomain);
+        if (Entry->lpName) {
             _strcat(szBuffer, TEXT("\\"));
-            _strcat(szBuffer, lpName);
+            _strcat(szBuffer, Entry->lpName);
         }
     }
     else {
-        if (lpName)
-            _strcpy(szBuffer, lpName);
+        if (Entry->lpName)
+            _strcpy(szBuffer, Entry->lpName);
+        else
+            _strcpy(szBuffer, T_NotAssigned);
     }
 
     lvItem.pszText = szBuffer;
@@ -184,26 +248,27 @@ VOID CALLBACK OutputAclEntryCallback(
     //
     // Alias.
     //
-    lvItem.pszText = lpSidNameUse;
-    lvItem.cchTextMax = (INT)_strlen(lpSidNameUse);
+    lvItem.pszText = Entry->lpSidNameUse;
+    lvItem.cchTextMax = (INT)_strlen(lvItem.pszText);
     ++lvItem.iSubItem;
     ListView_SetItem(hwndList, &lvItem);
 }
 
 /*
-* SdViewDumpAceList
+* SDViewDumpAceList
 *
 * Purpose:
 *
 * Output ACE list members.
 *
 */
-VOID SdViewDumpAceList(
+VOID SDViewDumpAceList(
     _In_ SDVIEW_CONTEXT* Context,
     _In_ ULONG AceCount,
     _In_ PVOID FirstAce,
     _In_ LSA_HANDLE PolicyHandle,
-    _In_ pfnAceOutputCallback OutputCallback
+    _In_ pfnAceOutputCallback OutputCallback,
+    _In_ PVOID CallbackContext
 )
 {
     ULONG domainIndex, nCount, domainsEntries = 0;
@@ -225,6 +290,8 @@ VOID SdViewDumpAceList(
     WCHAR szDomain[512], szName[512];
     WCHAR szAccessMask[32], szAceType[32], szAceFlags[32];
     LPWSTR lpAceType;
+
+    ACE_DUMP_ENTRY dumpData;
 
     union {
         PBYTE ListRef;
@@ -342,11 +409,11 @@ VOID SdViewDumpAceList(
             switch (aceList.Header->AceType) {
 
             case ACCESS_ALLOWED_ACE_TYPE:
-                lpAceType = L"Allowed";
+                lpAceType = L"AccessAllowed";
                 break;
 
             case ACCESS_DENIED_ACE_TYPE:
-                lpAceType = L"Denied";
+                lpAceType = L"AccessDenied";
                 break;
 
             case SYSTEM_MANDATORY_LABEL_ACE_TYPE:
@@ -416,14 +483,15 @@ VOID SdViewDumpAceList(
                 break;
             }
 
-            OutputCallback(Context,
-                lpAceType,
-                szAceFlags,
-                szAccessMask,
-                bDomainNamePresent ? szDomain : NULL,
-                bNamePresent ? szName : NULL,
-                supGetSidNameUse(sidNameUse),
-                &stringSid);
+            dumpData.lpAccessMask = szAccessMask;
+            dumpData.lpAceFlags = szAceFlags;
+            dumpData.lpAceType = lpAceType;
+            dumpData.lpDomain = bDomainNamePresent ? szDomain : NULL;
+            dumpData.lpName = bNamePresent ? szName : NULL;
+            dumpData.lpSidNameUse = supGetSidNameUse(sidNameUse);
+            dumpData.SidString = &stringSid;
+
+            OutputCallback(Context, &dumpData, CallbackContext);
 
             RtlFreeUnicodeString(&stringSid);
 
@@ -439,18 +507,19 @@ VOID SdViewDumpAceList(
 }
 
 /*
-* SdViewDumpAcl
+* SDViewDumpAcl
 *
 * Purpose:
 *
 * Output ACL information.
 *
 */
-VOID SdViewDumpAcl(
+VOID SDViewDumpAcl(
     _In_ SDVIEW_CONTEXT* Context,
     _In_opt_ PACL Acl,
     _In_ LSA_HANDLE PolicyHandle,
-    _In_ pfnAceOutputCallback OutputCallback
+    _In_ pfnAceOutputCallback OutputCallback,
+    _In_ PVOID CallbackContext
 )
 {
     PVOID firstAce = NULL;
@@ -465,28 +534,31 @@ VOID SdViewDumpAcl(
 
     if (NT_SUCCESS(RtlGetAce(Acl, 0, &firstAce))) {
 
-        SdViewDumpAceList(Context,
+        SDViewDumpAceList(Context,
             Acl->AceCount,
             firstAce,
             PolicyHandle,
-            OutputCallback);
+            OutputCallback,
+            CallbackContext);
 
     }
 }
 
 /*
-* SdViewDumpSid
+* SDViewDumpSid
 *
 * Purpose:
 *
 * Output SID information.
 *
 */
-VOID SdViewDumpSid(
+//FIXME
+VOID SDViewDumpSid(
     _In_ SDVIEW_CONTEXT* Context,
     _In_ PSID Sid,
     _In_ LSA_HANDLE PolicyHandle,
-    _In_ pfnSidOutputCallback OutputCallback
+    _In_ pfnSidOutputCallback OutputCallback,
+    _In_opt_ PVOID CallbackContext
 )
 {
     ULONG domainIndex, domainsEntries;
@@ -589,7 +661,7 @@ VOID SdViewDumpSid(
         }
 
         RtlFreeUnicodeString(&stringSid);
-        OutputCallback(Context, szBuffer);
+        OutputCallback(Context, szBuffer, CallbackContext);
 
     }
     __finally {
@@ -599,14 +671,14 @@ VOID SdViewDumpSid(
 }
 
 /*
-* SdViewDumpObjectSecurity
+* SDViewDumpObjectSecurity
 *
 * Purpose:
 *
 * Dump object security information (dacl, sacl, sid).
 *
 */
-NTSTATUS SdViewDumpObjectSecurity(
+NTSTATUS SDViewDumpObjectSecurity(
     _In_ SDVIEW_CONTEXT* Context
 )
 {
@@ -653,7 +725,8 @@ NTSTATUS SdViewDumpObjectSecurity(
         ntQueryStatus = RtlGetOwnerSecurityDescriptor(pSD, &pOwnerSid, &bDefaulted);
         if (NT_SUCCESS(ntQueryStatus)) {
 
-            SdViewDumpSid(Context, pOwnerSid, hPolicy, &OutputSidCallback);
+            SDViewDumpSid(Context, pOwnerSid, hPolicy, 
+                &OutputSidCallback, NULL);
 
         }
 
@@ -661,7 +734,8 @@ NTSTATUS SdViewDumpObjectSecurity(
         ntQueryStatus = RtlGetDaclSecurityDescriptor(pSD, &bPresent, &pAcl, &bDefaulted);
         if (NT_SUCCESS(ntQueryStatus)) {
 
-            SdViewDumpAcl(Context, pAcl, hPolicy, &OutputAclEntryCallback);
+            SDViewDumpAcl(Context, pAcl, hPolicy, 
+                &OutputAclEntryCallback, IntToPtr(0));
 
         }
 
@@ -669,7 +743,8 @@ NTSTATUS SdViewDumpObjectSecurity(
         ntQueryStatus = RtlGetSaclSecurityDescriptor(pSD, &bPresent, &pAcl, &bDefaulted);
         if (NT_SUCCESS(ntQueryStatus)) {
 
-            SdViewDumpAcl(Context, pAcl, hPolicy, &OutputAclEntryCallback);
+            SDViewDumpAcl(Context, pAcl, hPolicy, 
+                &OutputAclEntryCallback, IntToPtr(1));
 
         }
 
@@ -692,36 +767,50 @@ NTSTATUS SdViewDumpObjectSecurity(
 *
 */
 VOID SDViewInitControls(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ SDVIEW_CONTEXT* Context
 )
 {
+    LVGROUP lvg;
+
     struct LVColumns {
         LPWSTR Name;
         INT Width;
         INT Format;
     } columnData[] =
     {
-        { L"Type", 80, LVCFMT_CENTER },
-        { L"Flags", 80, LVCFMT_CENTER },
+        { L"AceType", 80, LVCFMT_CENTER },
+        { L"AceFlags", 80, LVCFMT_CENTER },
         { L"AccessMask", 120, LVCFMT_CENTER },
         { L"SID", 120, LVCFMT_LEFT },
         { L"Domain\\Name", 200, LVCFMT_LEFT },
         { L"UseName", 120, LVCFMT_LEFT }
     };
 
+    struct LVGroups {
+        LPWSTR Name;
+        INT Id;
+    } groupData[] = {
+        { L"ACL", 0 },
+        { L"SACL", 1 }
+    };
+
     INT i;
     HWND aclList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
     HWND sidOwner = GetDlgItem(hwndDlg, IDC_SDVIEW_OWNER);
-    DWORD dwStyle = LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP;
+    HWND okButton = GetDlgItem(hwndDlg, IDOK);
 
-    if (g_WinObj.ListViewDisplayGrid)
-        dwStyle |= LVS_EX_GRIDLINES;
+    //
+    // Set listview style flags and theme.
+    //
+    supSetListViewSettings(aclList,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        FALSE,
+        TRUE,
+        NULL,
+        0);
 
-    ListView_SetExtendedListViewStyle(aclList, dwStyle);
-
-    // SendMessage(aclList, LVM_ENABLEGROUPVIEW, 1, 0);
-
-    SetWindowTheme(aclList, TEXT("Explorer"), NULL);
+    SendMessage(aclList, LVM_ENABLEGROUPVIEW, 1, 0);
 
     for (i = 0; i < RTL_NUMBER_OF(columnData); i++) {
 
@@ -732,7 +821,106 @@ VOID SDViewInitControls(
             columnData[i].Width);
     }
 
+    RtlSecureZeroMemory(&lvg, sizeof(lvg));
+    lvg.cbSize = sizeof(LVGROUP);
+    lvg.mask = LVGF_HEADER | LVGF_ALIGN | LVGF_GROUPID;
+    lvg.uAlign = LVGA_HEADER_LEFT;
+
+    for (i = 0; i < RTL_NUMBER_OF(groupData); i++) {
+        lvg.pszHeader = groupData[i].Name;
+        lvg.cchHeader = (INT)_strlen(lvg.pszHeader);
+        lvg.iGroupId = groupData[i].Id;
+        SendMessage(aclList, LVM_INSERTGROUP, (WPARAM)i, (LPARAM)&lvg);
+    }
+
     SetWindowText(sidOwner, T_EmptyString);
+
+    GetClientRect(hwndDlg, &Context->WindowRect);
+    GetWindowRect(aclList, &Context->ListRect);
+    GetWindowRect(okButton, &Context->ButtonRect);
+    ScreenToClient(hwndDlg, (LPPOINT)&Context->ButtonRect);
+}
+
+
+/*
+* SdViewHandlePopup
+*
+* Purpose:
+*
+* List popup construction.
+*
+*/
+VOID SDViewHandlePopup(
+    _In_ SDVIEW_CONTEXT* Context,
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT point
+)
+{
+    HMENU hMenu;
+    HWND hwndList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+
+        if (supListViewAddCopyValueItem(hMenu,
+            hwndList,
+            ID_OBJECT_COPY,
+            0,
+            point,
+            &Context->iSelectedItem,
+            &Context->iColumnHit))
+        {
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                point->x,
+                point->y,
+                0,
+                hwndDlg,
+                NULL);
+        }
+        DestroyMenu(hMenu);
+    }
+}
+
+/*
+* SDViewOnResize
+*
+* Purpose:
+*
+* WM_SIZE handler.
+*
+*/
+VOID SDViewOnResize(
+    _In_ SDVIEW_CONTEXT* Context,
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
+)
+{
+    HWND hwndList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
+    HWND hwndButton = GetDlgItem(hwndDlg, IDOK);
+    WORD dlgWidth = LOWORD(lParam), dlgHeight = HIWORD(lParam);
+
+    INT dx, dy;
+
+    dx = Context->WindowRect.right - Context->ListRect.right;
+    dy = Context->WindowRect.bottom - Context->ListRect.bottom;
+
+    SetWindowPos(hwndList, NULL, 0, 0,
+        dlgWidth - dx - Context->ListRect.left,
+        dlgHeight - dy - Context->ListRect.top,
+        SWP_NOMOVE);
+
+    dx = Context->WindowRect.right - Context->ButtonRect.left;
+    dy = Context->WindowRect.bottom - Context->ButtonRect.top;
+
+    SetWindowPos(hwndButton, NULL,
+        dlgWidth - dx,
+        dlgHeight - dy,
+        0, 0,
+        SWP_NOSIZE);
+
+    SendMessage(Context->StatusBar, WM_SIZE, 0, 0);
+    RedrawWindow(hwndDlg, NULL, 0, RDW_ERASE | RDW_INVALIDATE | RDW_ERASENOW);
 }
 
 /*
@@ -752,28 +940,69 @@ INT_PTR CALLBACK SDViewDialogProc(
     _In_ LPARAM lParam
 )
 {
-    SDVIEW_CONTEXT* sdvContext;
+    INT mark;
+    RECT crc;
+    SDVIEW_CONTEXT* dlgContext;
 
     switch (uMsg) {
 
     case WM_INITDIALOG:
         supCenterWindow(hwndDlg);
         if (lParam) {
-            sdvContext = (SDVIEW_CONTEXT*)lParam;
+            dlgContext = (SDVIEW_CONTEXT*)lParam;
             SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
+            SDViewInitControls(hwndDlg, dlgContext);
         }
-        SDViewInitControls(hwndDlg);
+        break;
+
+    case WM_CONTEXTMENU:
+
+        dlgContext = GetProp(hwndDlg, T_DLGCONTEXT);
+        if (dlgContext) {
+
+            if ((HWND)wParam == dlgContext->AceList) {
+
+                mark = ListView_GetSelectionMark(dlgContext->AceList);
+
+                RtlSecureZeroMemory(&crc, sizeof(crc));
+                if (lParam == MAKELPARAM(-1, -1)) {
+                    ListView_GetItemRect(dlgContext->AceList, mark, &crc, TRUE);
+                    crc.top = crc.bottom;
+                    ClientToScreen(dlgContext->AceList, (LPPOINT)&crc);
+                }
+                else
+                    GetCursorPos((LPPOINT)&crc);
+
+                SDViewHandlePopup(dlgContext, hwndDlg, (LPPOINT)&crc);
+
+            }
+
+        }
+        break;
+
+    case WM_SIZE:
+        dlgContext = GetProp(hwndDlg, T_DLGCONTEXT);
+        if (dlgContext) {
+            SDViewOnResize(dlgContext, hwndDlg, lParam);
+        }
         break;
 
     case WM_CLOSE:
-        sdvContext = (SDVIEW_CONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
-        if (sdvContext) {
-            if (sdvContext->DialogIcon)
-                DestroyIcon(sdvContext->DialogIcon);
+        dlgContext = (SDVIEW_CONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
+        if (dlgContext) {
+            if (dlgContext->DialogIcon)
+                DestroyIcon(dlgContext->DialogIcon);
 
-            FreeSDViewContext(sdvContext);
+            FreeSDViewContext(dlgContext);
         }
         return DestroyWindow(hwndDlg);
+
+    case WM_GETMINMAXINFO:
+        if (lParam) {
+            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = SCALE_DPI_VALUE(480, g_WinObj.CurrentDPI);
+            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = SCALE_DPI_VALUE(320, g_WinObj.CurrentDPI);
+        }
+        break;
 
     case WM_COMMAND:
 
@@ -781,16 +1010,55 @@ INT_PTR CALLBACK SDViewDialogProc(
         case IDCANCEL:
         case IDOK:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
+            break;
+
+        case ID_OBJECT_COPY:
+            dlgContext = GetProp(hwndDlg, T_DLGCONTEXT);
+            if (dlgContext) {
+                supListViewCopyItemValueToClipboard(dlgContext->AceList,
+                    dlgContext->iSelectedItem,
+                    dlgContext->iColumnHit);
+            }
+            break;
         default:
             break;
-        }
 
+        }
     default:
         return FALSE;
     }
 
     return TRUE;
+}
+
+//
+// TBD
+// FIXME
+//
+VOID SDViewSetCaption(
+    _In_ HWND DialogWindow,
+    _In_ LPWSTR ObjectDirectory,
+    _In_ LPWSTR ObjectName,
+    _In_ WOBJ_OBJECT_TYPE ObjectType
+)
+{
+    LPWSTR lpText;
+    SIZE_T cch;
+
+    UNREFERENCED_PARAMETER(ObjectDirectory);
+    UNREFERENCED_PARAMETER(ObjectType);
+
+    cch = MAX_PATH +
+        _strlen(ObjectName);
+
+    lpText = supHeapAlloc(cch * sizeof(WCHAR));
+    if (lpText) {
+        _strcpy(lpText, TEXT("Security Descriptor ("));
+        _strcat(lpText, ObjectName);
+        _strcat(lpText, TEXT(")"));
+        SetWindowText(DialogWindow, lpText);
+        supHeapFree(lpText);
+    }
 }
 
 /*
@@ -812,9 +1080,7 @@ VOID SDViewDialogCreate(
     HWND hwndDlg;
     NTSTATUS ntStatus;
     SDVIEW_CONTEXT* SDViewContext;
-
     LPWSTR lpText;
-//    SIZE_T nLen;
 
     ENUMCHILDWNDDATA wndData;
 
@@ -835,7 +1101,6 @@ VOID SDViewDialogCreate(
         (LPARAM)SDViewContext);
 
     if (hwndDlg) {
-        SetWindowText(hwndDlg, TEXT("Security Descriptor"));
 
         //
         // Set dialog icon.
@@ -853,13 +1118,17 @@ VOID SDViewDialogCreate(
         }
 
         SDViewContext->DialogWindow = hwndDlg;
+        SDViewContext->AceList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
+        SDViewContext->StatusBar = GetDlgItem(hwndDlg, IDC_SDVIEW_STATUSBAR);
+
+        SDViewSetCaption(hwndDlg, ObjectDirectory, ObjectName, ObjectType);
 
         //
         // Dump object security information.
         //
-        ntStatus = SdViewDumpObjectSecurity(SDViewContext);
+        ntStatus = SDViewDumpObjectSecurity(SDViewContext);
         if (NT_SUCCESS(ntStatus)) {
-            SetFocus(GetDlgItem(hwndDlg, IDC_SDVIEW_LIST));
+            SetFocus(SDViewContext->AceList);
         }
         else {
             //

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       PLUGMNGR.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        05 Dec 2020
 *
 *  Plugin manager.
 *
@@ -897,10 +897,12 @@ VOID PmpEnumerateEntries(
     INT lvItemIndex;
     WCHAR szBuffer[100];
 
-    ListView_SetExtendedListViewStyle(ListView,
-        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
-
-    SetWindowTheme(ListView, TEXT("Explorer"), NULL);
+    supSetListViewSettings(ListView,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        FALSE,
+        TRUE,
+        NULL,
+        0);
 
     supAddListViewColumn(ListView, 0, 0, 0,
         I_IMAGENONE,

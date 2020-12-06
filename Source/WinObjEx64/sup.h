@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       SUP.H
 *
 *  VERSION:     1.88
 *
-*  DATE:        04 Dec 2020
+*  DATE:        05 Dec 2020
 *
 *  Common header file for the program support routines.
 *
@@ -409,6 +409,14 @@ BOOL supSaveDialogExecute(
     _In_ HWND OwnerWindow,
     _Inout_ LPWSTR SaveFileName,
     _In_ LPWSTR lpDialogFilter);
+
+VOID supSetListViewSettings(
+    _In_ HWND hwndLV,
+    _In_ DWORD dwExtendedStyle,
+    _In_ BOOL fIgnoreGlobalSettings,
+    _In_ BOOL fSetTheme,
+    _In_opt_ HIMAGELIST hImageList,
+    _In_ INT iImageList);
 
 HICON supGetStockIcon(
     _In_ SHSTOCKICONID siid,

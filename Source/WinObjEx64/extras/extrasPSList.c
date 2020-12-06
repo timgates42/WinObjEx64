@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       EXTRASPSLIST.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        29 Nov 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1553,15 +1553,17 @@ VOID extrasCreatePsListDialog(
     SendMessage(PsDlgContext.StatusBar, SB_SETPARTS, 3, (LPARAM)&SbParts);
 
     if (PsDlgContext.ListView) {
-        ListView_SetImageList(PsDlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
-        ListView_SetExtendedListViewStyle(PsDlgContext.ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
-        SetWindowTheme(PsDlgContext.ListView, TEXT("Explorer"), NULL);
+
+        supSetListViewSettings(PsDlgContext.ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER,
+            FALSE,
+            TRUE,
+            g_ListViewImages,
+            LVSIL_SMALL);
 
         //
         // Add listview columns.
         //
-
         supAddListViewColumn(PsDlgContext.ListView, 0, 0, 0,
             ImageList_GetImageCount(g_ListViewImages) - 1,
             LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,

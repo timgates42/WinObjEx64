@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2016 - 2020
+*  (C) COPYRIGHT AUTHORS, 2016 - 2021
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        04 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -621,16 +621,16 @@ VOID extrasCreateDriversDialog(
         //
         // Set listview imagelist, style flags and theme.
         //
-        ListView_SetImageList(DrvDlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
-        ListView_SetExtendedListViewStyle(DrvDlgContext.ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-        SetWindowTheme(DrvDlgContext.ListView, TEXT("Explorer"), NULL);
+        supSetListViewSettings(DrvDlgContext.ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            FALSE,
+            TRUE,
+            g_ListViewImages,
+            LVSIL_SMALL);
 
         //
         // Add listview columns.
         //
-
         supAddListViewColumn(DrvDlgContext.ListView, 0, 0, 0,
             ImageList_GetImageCount(g_ListViewImages) - 1,
             LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,

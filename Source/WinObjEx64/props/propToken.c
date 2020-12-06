@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       PROPTOKEN.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        28 Nov 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -71,12 +71,17 @@ VOID TokenPageInitControls(
     g_lvTokenPageSelectedItem = -1;
     g_lvTokenPageColumnHit = -1;
 
-    ListView_SetExtendedListViewStyle(g_hwndTokenPageList,
-        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
+    //
+    // Set listview style flags and theme.
+    //
+    supSetListViewSettings(g_hwndTokenPageList,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        FALSE,
+        TRUE,
+        NULL,
+        0);
 
     SendMessage(g_hwndTokenPageList, LVM_ENABLEGROUPVIEW, 1, 0);
-
-    SetWindowTheme(g_hwndTokenPageList, TEXT("Explorer"), NULL);
 
     supAddListViewColumn(g_hwndTokenPageList, 0, 0, 0,
         I_IMAGENONE,

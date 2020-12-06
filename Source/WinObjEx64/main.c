@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       MAIN.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        01 Dec 2020
+*  DATE:        05 Dec 2020
 *
 *  Program entry point and main window handler.
 *
@@ -1548,7 +1548,6 @@ UINT WinObjExMain()
         //
         // Hide admin only stuff.
         //
-
         MainWindowExtrasDisableAdminFeatures(MainWindow);
 
         //

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2020
+*  (C) COPYRIGHT AUTHORS, 2017 - 2021
 *
 *  TITLE:       EXTRASIPC.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        01 Dec 2020
+*  DATE:        05 Dec 2020
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -906,13 +906,17 @@ VOID extrasCreateIpcDialog(
                 ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
                 DestroyIcon(hIcon);
             }
-            ListView_SetImageList(pDlgContext->ListView, pDlgContext->ImageList, LVSIL_SMALL);
         }
 
-        ListView_SetExtendedListViewStyle(pDlgContext->ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-        SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
+        //
+        // Set listview imagelist, style flags and theme.
+        //
+        supSetListViewSettings(pDlgContext->ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            FALSE,
+            TRUE,
+            pDlgContext->ImageList,
+            LVSIL_SMALL);
 
         supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
             2,

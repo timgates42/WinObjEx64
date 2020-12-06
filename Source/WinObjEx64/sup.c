@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       SUP.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        04 Dec 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2734,6 +2734,41 @@ BOOL supSaveDialogExecute(
     tag1.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
 
     return GetSaveFileName(&tag1);
+}
+
+/*
+* supSetListViewSettings
+*
+* Purpose:
+*
+* Set listview imagelist, style flags and theme.
+*
+*/
+VOID supSetListViewSettings(
+    _In_ HWND hwndLV,
+    _In_ DWORD dwExtendedStyle,
+    _In_ BOOL fIgnoreGlobalSettings,
+    _In_ BOOL fSetTheme,
+    _In_opt_ HIMAGELIST hImageList,
+    _In_ INT iImageList
+)
+{
+    DWORD dwFlags = dwExtendedStyle;
+
+    if (!fIgnoreGlobalSettings) {
+        if (g_WinObj.ListViewDisplayGrid)
+            dwFlags |= LVS_EX_GRIDLINES;
+    }
+
+    ListView_SetExtendedListViewStyle(hwndLV, dwFlags);
+
+    if (hImageList) {
+        ListView_SetImageList(hwndLV, hImageList, iImageList);
+    }
+
+    if (fSetTheme) {
+        SetWindowTheme(hwndLV, TEXT("Explorer"), NULL);
+    }
 }
 
 /*

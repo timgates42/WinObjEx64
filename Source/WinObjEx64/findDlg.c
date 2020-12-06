@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       FINDDLG.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -478,19 +478,22 @@ VOID FindDlgCreate(
 
     FindDlgList = GetDlgItem(FindDialog, ID_SEARCH_LIST);
     if (FindDlgList) {
+        
         bFindDlgSortInverse = FALSE;
-        ListView_SetImageList(FindDlgList, g_ListViewImages, LVSIL_SMALL);
 
-        ListView_SetExtendedListViewStyle(
-            FindDlgList,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-        SetWindowTheme(FindDlgList, TEXT("Explorer"), NULL);
+        //
+        // Set listview imagelist, style flags and theme.
+        //
+        supSetListViewSettings(FindDlgList,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            FALSE,
+            TRUE,
+            g_ListViewImages,
+            LVSIL_SMALL);
 
         //
         // Add listview columns.
         //
-
         supAddListViewColumn(FindDlgList, 0, 0, 0,
             ImageList_GetImageCount(g_ListViewImages) - 1,
             LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,

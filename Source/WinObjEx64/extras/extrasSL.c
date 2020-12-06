@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       EXTRASSL.C
 *
 *  VERSION:     1.88
 *
-*  DATE:        01 Dec 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -523,17 +523,16 @@ VOID extrasCreateSLCacheDialog(
             //
             // Set listview imagelist, style flags and theme.
             //
-            ListView_SetImageList(pDlgContext->ListView, g_ListViewImages, LVSIL_SMALL);
-            ListView_SetExtendedListViewStyle(
-                pDlgContext->ListView,
-                LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-            SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
+            supSetListViewSettings(pDlgContext->ListView,
+                LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+                FALSE,
+                TRUE,
+                g_ListViewImages,
+                LVSIL_SMALL);
 
             //
             // Create ListView columns.
             //
-
             supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
                 ImageList_GetImageCount(g_ListViewImages) - 1,
                 LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
