@@ -529,10 +529,13 @@ VOID TokenPageShowAdvancedProperties(
 */
 VOID TokenPageHandlePopup(
     _In_ HWND hwndDlg,
-    _In_ LPPOINT point
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
 )
 {
     HMENU hMenu;
+
+    UNREFERENCED_PARAMETER(lpUserParam);
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
@@ -541,16 +544,16 @@ VOID TokenPageHandlePopup(
             g_hwndTokenPageList,
             ID_OBJECT_COPY,
             0,
-            point,
+            lpPoint,
             &g_lvTokenPageSelectedItem,
             &g_lvTokenPageColumnHit))
         {
-            TrackPopupMenu(hMenu, 
-                TPM_RIGHTBUTTON | TPM_LEFTALIGN, 
-                point->x, 
-                point->y, 
-                0, 
-                hwndDlg, 
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                lpPoint->x,
+                lpPoint->y,
+                0,
+                hwndDlg,
                 NULL);
         }
         DestroyMenu(hMenu);
@@ -656,29 +659,17 @@ INT_PTR CALLBACK TokenPageDialogProc(
     _In_  LPARAM lParam
 )
 {
-    RECT crc;
-    INT mark;
-
     switch (uMsg) {
 
     case WM_CONTEXTMENU:
-        RtlSecureZeroMemory(&crc, sizeof(crc));
 
-        if ((HWND)wParam == g_hwndTokenPageList) {
-            mark = ListView_GetSelectionMark(g_hwndTokenPageList);
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            g_hwndTokenPageList,
+            (pfnPopupMenuHandler)TokenPageHandlePopup,
+            NULL);
 
-            if (lParam == MAKELPARAM(-1, -1)) {
-                ListView_GetItemRect(g_hwndTokenPageList, mark, &crc, TRUE);
-                crc.top = crc.bottom;
-                ClientToScreen(g_hwndTokenPageList, (LPPOINT)&crc);
-            }
-            else
-                GetCursorPos((LPPOINT)&crc);
-
-            TokenPageHandlePopup(hwndDlg, (LPPOINT)&crc);
-
-            return 1;
-        }
         break;
 
     case WM_COMMAND:
@@ -694,7 +685,7 @@ INT_PTR CALLBACK TokenPageDialogProc(
         break;
 
     default:
-        break;
+        return 0;
     }
-    return 0;
+    return 1;
 }

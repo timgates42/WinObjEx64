@@ -93,15 +93,14 @@ INT CALLBACK SdtDlgCompareFunc(
 *
 */
 VOID SdtHandlePopupMenu(
-    _In_ EXTRASCONTEXT* Context
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
 )
 {
-    POINT pt1;
     HMENU hMenu;
     UINT uPos = 0;
-
-    if (GetCursorPos(&pt1) == FALSE)
-        return;
+    EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
@@ -110,7 +109,7 @@ VOID SdtHandlePopupMenu(
             Context->ListView,
             ID_OBJECT_COPY,
             uPos,
-            &pt1,
+            lpPoint,
             &Context->lvItemHit,
             &Context->lvColumnHit))
         {
@@ -122,7 +121,15 @@ VOID SdtHandlePopupMenu(
         InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_SDTLIST_SAVE, T_EXPORTTOFILE);
         InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_RESCAN);
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, Context->hwndDlg, NULL);
+
+        TrackPopupMenu(hMenu,
+            TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+            lpPoint->x,
+            lpPoint->y,
+            0,
+            hwndDlg,
+            NULL);
+
         DestroyMenu(hMenu);
     }
 }
@@ -281,7 +288,7 @@ INT_PTR CALLBACK SdtDialogProc(
             else if (pDlgContext->DialogMode == SST_Win32k)
                 dlgIndex = wobjW32SSTDlgId;
 
-            if ((dlgIndex == wobjKSSTDlgId) || 
+            if ((dlgIndex == wobjKSSTDlgId) ||
                 (dlgIndex == wobjW32SSTDlgId))
             {
                 g_WinObj.AuxDialogs[dlgIndex] = NULL;
@@ -343,7 +350,14 @@ INT_PTR CALLBACK SdtDialogProc(
     case WM_CONTEXTMENU:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
-            SdtHandlePopupMenu(pDlgContext);
+
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pDlgContext->ListView,
+                (pfnPopupMenuHandler)SdtHandlePopupMenu,
+                (PVOID)pDlgContext);
+
         }
         break;
 

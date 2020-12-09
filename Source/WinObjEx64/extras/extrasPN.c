@@ -614,7 +614,7 @@ VOID PNDlgShowNamespaceInfo(
 * WM_NOTIFY processing for PNDialog listview.
 *
 */
-BOOL PNDlgHandleNotify(
+VOID PNDlgHandleNotify(
     _In_ HWND hwndDlg,
     _In_ WPARAM wParam,
     _In_ LPARAM lParam
@@ -626,7 +626,7 @@ BOOL PNDlgHandleNotify(
     UNREFERENCED_PARAMETER(wParam);
 
     if (pListView == NULL)
-        return FALSE;
+        return;
 
     if (pListView->hdr.idFrom == ID_NAMESPACELIST) {
 
@@ -653,7 +653,7 @@ BOOL PNDlgHandleNotify(
 
         case LVN_ITEMCHANGED:
 
-            if ((pListView->uNewState & LVIS_SELECTED) && 
+            if ((pListView->uNewState & LVIS_SELECTED) &&
                 !(pListView->uOldState & LVIS_SELECTED))
             {
                 PNDlgShowNamespaceInfo(hwndDlg, pListView->iItem);
@@ -665,11 +665,10 @@ BOOL PNDlgHandleNotify(
             break;
 
         default:
-            return FALSE;
+            break;
         }
     }
 
-    return TRUE;
 }
 
 /*
@@ -743,6 +742,46 @@ VOID PNDialogShowInfo(
 }
 
 /*
+* SdViewHandlePopup
+*
+* Purpose:
+*
+* List popup construction.
+*
+*/
+VOID PNDialogHandlePopup(
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
+)
+{
+    HMENU hMenu;
+    EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->ListView,
+            ID_OBJECT_COPY,
+            0,
+            lpPoint,
+            &Context->lvItemHit,
+            &Context->lvColumnHit))
+        {
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                lpPoint->x,
+                lpPoint->y,
+                0,
+                hwndDlg,
+                NULL);
+        }
+        DestroyMenu(hMenu);
+    }
+}
+
+/*
 * PNDialogProc
 *
 * Purpose:
@@ -759,17 +798,29 @@ INT_PTR CALLBACK PNDialogProc(
 {
     switch (uMsg) {
     case WM_NOTIFY:
-        return PNDlgHandleNotify(hwndDlg, wParam, lParam);
+        PNDlgHandleNotify(hwndDlg, wParam, lParam);
+        break;
 
     case WM_INITDIALOG:
         supCenterWindow(hwndDlg);
-        return TRUE;
+        break;
+
+    case WM_CONTEXTMENU:
+
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            PnDlgContext.ListView,
+            (pfnPopupMenuHandler)PNDialogHandlePopup,
+            (PVOID)&PnDlgContext);
+
+        break;
 
     case WM_CLOSE:
         DestroyWindow(hwndDlg);
         ObCollectionDestroy(&PNSCollection);
         g_WinObj.AuxDialogs[wobjPNSDlgId] = NULL;
-        return TRUE;
+        break;
 
     case WM_COMMAND:
 
@@ -777,16 +828,15 @@ INT_PTR CALLBACK PNDialogProc(
 
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
+            break;
 
         case ID_VIEW_REFRESH:
             PNDialogShowInfo(TRUE);
-            return TRUE;
+            break;
 
         case ID_BDESCRIPTOR_SID:
             if (HIWORD(wParam) == CBN_SELCHANGE) {
                 PNDlgOutputSelectedSidInformation(hwndDlg, NULL);
-                return TRUE;
             }
             break;
 
@@ -794,13 +844,22 @@ INT_PTR CALLBACK PNDialogProc(
             PNDlgCopySelectedSid(hwndDlg);
             return TRUE;
 
+        case ID_OBJECT_COPY:
+            supListViewCopyItemValueToClipboard(PnDlgContext.ListView,
+                PnDlgContext.lvItemHit,
+                PnDlgContext.lvColumnHit);
+            break;
+
         default:
             break;
         }
 
         break;
+
+    default:
+        return FALSE;
     }
-    return FALSE;
+    return TRUE;
 }
 
 /*

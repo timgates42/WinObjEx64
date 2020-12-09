@@ -431,7 +431,8 @@ HTREEITEM AddProcessEntryTreeList(
     _In_ PVOID Data,
     _In_ ULONG_PTR ObjectAddress,
     _In_opt_ SCMDB* ServicesList,
-    _In_opt_ PSID OurSid
+    _In_opt_ PSID OurSid,
+    _In_opt_ LSA_HANDLE PolicyHandle
 )
 {
     HTREEITEM hTreeItem = NULL;
@@ -566,9 +567,9 @@ HTREEITEM AddProcessEntryTreeList(
     //
     // User.
     //
-    if (ProcessSid) {
+    if (ProcessSid && PolicyHandle) {
 
-        if (supLookupSidUserAndDomain(ProcessSid, &UserName)) {
+        if (supLookupSidUserAndDomainEx(ProcessSid, PolicyHandle, &UserName)) {
             subitems.Text[1] = UserName;
         }
         supHeapFree(ProcessSid);
@@ -1015,6 +1016,8 @@ DWORD WINAPI CreateProcessListProc(
     PSID OurSid = NULL;
     PWSTR lpErrorMsg;
 
+    LSA_HANDLE lsaPolicyHandle = NULL;
+
     SCMDB ServicesList;
 
     WCHAR szBuffer[100];
@@ -1099,12 +1102,19 @@ DWORD WINAPI CreateProcessListProc(
 
             OurSid = supQueryProcessSid(NtCurrentProcess());
 
+            lsaPolicyHandle = NULL;
+            supLsaOpenMachinePolicy(POLICY_LOOKUP_NAMES, &lsaPolicyHandle);
+
             NextEntryDelta = 0;
             ViewRootHandle = NULL;
             List.ListRef = (PBYTE)InfoBuffer;
 
             do {
                 List.ListRef += NextEntryDelta;
+                NextEntryDelta = List.ProcessEntry->NextEntryDelta;
+
+                if (List.ProcessEntry->UniqueProcessId == 0)
+                    continue;
 
                 ViewRootHandle = FindParentItem(PsDlgContext.TreeList,
                     List.ProcessEntry->InheritedFromUniqueProcessId);
@@ -1124,7 +1134,8 @@ DWORD WINAPI CreateProcessListProc(
                         (PVOID)List.ProcessEntry,
                         ObjectAddress,
                         &ServicesList,
-                        OurSid);
+                        OurSid,
+                        lsaPolicyHandle);
                 }
                 else {
                     AddProcessEntryTreeList(ViewRootHandle,
@@ -1132,16 +1143,17 @@ DWORD WINAPI CreateProcessListProc(
                         (PVOID)List.ProcessEntry,
                         ObjectAddress,
                         &ServicesList,
-                        OurSid);
+                        OurSid,
+                        lsaPolicyHandle);
                 }
 
                 if (ProcessHandle) {
                     NtClose(ProcessHandle);
                 }
 
-                NextEntryDelta = List.ProcessEntry->NextEntryDelta;
-
             } while (NextEntryDelta);
+
+            if (lsaPolicyHandle) LsaClose(lsaPolicyHandle);
 
         }
     }

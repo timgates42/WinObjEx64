@@ -1373,6 +1373,12 @@ BOOL supListViewCopyItemValueToClipboard(
         supHeapFree(lpText);
         return TRUE;
     }
+    else {
+        if (OpenClipboard(NULL)) {
+            EmptyClipboard();
+            CloseClipboard();
+        }
+    }
 
     return FALSE;
 }
@@ -5462,15 +5468,42 @@ BOOL supLookupSidUserAndDomainEx(
 */
 BOOL supLookupSidUserAndDomain(
     _In_ PSID Sid,
-    _Out_ LPWSTR * lpSidUserAndDomain
+    _Out_ LPWSTR* lpSidUserAndDomain
 )
 {
     BOOL bResult = FALSE;
-    LSA_OBJECT_ATTRIBUTES lobja;
     LSA_HANDLE PolicyHandle = NULL;
-    SECURITY_QUALITY_OF_SERVICE SecurityQualityOfService;
 
     *lpSidUserAndDomain = NULL;
+
+    if (NT_SUCCESS(supLsaOpenMachinePolicy(POLICY_LOOKUP_NAMES,
+        &PolicyHandle)))
+    {
+        bResult = supLookupSidUserAndDomainEx(Sid,
+            PolicyHandle,
+            lpSidUserAndDomain);
+
+        LsaClose(PolicyHandle);
+    }
+
+    return bResult;
+}
+
+/*
+* supLsaOpenMachinePolicy
+*
+* Purpose:
+*
+* Open local machine policy.
+*
+*/
+NTSTATUS supLsaOpenMachinePolicy(
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ PLSA_HANDLE PolicyHandle
+)
+{
+    LSA_OBJECT_ATTRIBUTES lobja;
+    SECURITY_QUALITY_OF_SERVICE SecurityQualityOfService;
 
     SecurityQualityOfService.Length = sizeof(SECURITY_QUALITY_OF_SERVICE);
     SecurityQualityOfService.ImpersonationLevel = SecurityImpersonation;
@@ -5486,21 +5519,11 @@ BOOL supLookupSidUserAndDomain(
 
     lobja.SecurityQualityOfService = &SecurityQualityOfService;
 
-    if (NT_SUCCESS(LsaOpenPolicy(
+    return LsaOpenPolicy(
         NULL,
         (PLSA_OBJECT_ATTRIBUTES)&lobja,
-        POLICY_LOOKUP_NAMES,
-        (PLSA_HANDLE)&PolicyHandle)))
-    {
-      
-        bResult = supLookupSidUserAndDomainEx(Sid,
-            PolicyHandle,
-            lpSidUserAndDomain);
-
-        LsaClose(PolicyHandle);
-    }
-
-    return bResult;
+        DesiredAccess,
+        PolicyHandle);
 }
 
 /*
@@ -7175,4 +7198,42 @@ NTSTATUS supQuerySecurityInformation(
         ReturnLength,
         (PNTSUPMEMALLOC)supHeapAlloc,
         (PNTSUPMEMFREE)supHeapFree);
+}
+
+/*
+* supHandleContextMenuMsgForListView
+*
+* Purpose:
+*
+* WM_CONTEXT handler for dialogs with a listview.
+*
+*/
+VOID supHandleContextMenuMsgForListView(
+    _In_ HWND hwndDlg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam,
+    _In_ HWND hwndControl,
+    _In_ pfnPopupMenuHandler MenuHandler,
+    _In_opt_ PVOID lpUserParam
+)
+{
+    INT mark;
+    RECT crc;
+
+    if ((HWND)wParam == hwndControl) {
+
+        mark = ListView_GetSelectionMark(hwndControl);
+
+        RtlSecureZeroMemory(&crc, sizeof(crc));
+        if (lParam == MAKELPARAM(-1, -1)) {
+            ListView_GetItemRect(hwndControl, mark, &crc, TRUE);
+            crc.top = crc.bottom;
+            ClientToScreen(hwndControl, (LPPOINT)&crc);
+        }
+        else
+            GetCursorPos((LPPOINT)&crc);
+
+        MenuHandler(hwndDlg, (LPPOINT)&crc, lpUserParam);
+
+    }
 }

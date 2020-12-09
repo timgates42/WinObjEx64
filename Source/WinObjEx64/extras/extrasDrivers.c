@@ -67,41 +67,49 @@ VOID DrvUpdateStatusBar(
 *
 */
 VOID DrvHandlePopupMenu(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
 )
 {
-    POINT pt1;
     HMENU hMenu;
     UINT uPos = 0;
+    EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
 
-    if (GetCursorPos(&pt1)) {
-        hMenu = CreatePopupMenu();
-        if (hMenu) {
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
 
-            if (supListViewAddCopyValueItem(hMenu, 
-                DrvDlgContext.ListView, 
-                ID_OBJECT_COPY, 
-                uPos, 
-                &pt1,
-                &DrvDlgContext.lvItemHit,
-                &DrvDlgContext.lvColumnHit))
-            {
-                uPos++;
-                InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            }
-
-            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_PROP, T_PROPERTIES);
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->ListView,
+            ID_OBJECT_COPY,
+            uPos,
+            lpPoint,
+            &Context->lvItemHit,
+            &Context->lvColumnHit))
+        {
+            uPos++;
             InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            if (kdConnectDriver()) {
-                InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_DUMP, T_DUMPDRIVER);
-            }
-            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
-            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_SAVE, T_EXPORTTOFILE);
-            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_REFRESH, T_VIEW_REFRESH);
-            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
-            DestroyMenu(hMenu);
         }
+
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_PROP, T_PROPERTIES);
+        InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        if (kdConnectDriver()) {
+            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_DUMP, T_DUMPDRIVER);
+        }
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_SAVE, T_EXPORTTOFILE);
+        InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_DRVLIST_REFRESH, T_VIEW_REFRESH);
+
+        TrackPopupMenu(hMenu,
+            TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+            lpPoint->x,
+            lpPoint->y,
+            0,
+            hwndDlg,
+            NULL);
+
+        DestroyMenu(hMenu);
     }
 }
 
@@ -563,7 +571,14 @@ INT_PTR CALLBACK DriversDialogProc(
         break;
 
     case WM_CONTEXTMENU:
-        DrvHandlePopupMenu(hwndDlg);
+
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            DrvDlgContext.ListView,
+            (pfnPopupMenuHandler)DrvHandlePopupMenu,
+            &DrvDlgContext);
+        
         break;
 
     default:

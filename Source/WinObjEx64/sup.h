@@ -582,6 +582,10 @@ BOOL supLookupSidUserAndDomain(
     _In_ PSID Sid,
     _Out_ LPWSTR * lpSidUserAndDomain);
 
+NTSTATUS supLsaOpenMachinePolicy(
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ PLSA_HANDLE PolicyHandle);
+
 PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
     _In_ ULONG_PTR FilterUniqueProcessId,
     _In_ BOOLEAN fObject);
@@ -752,3 +756,17 @@ NTSTATUS supQuerySecurityInformation(
     _In_ SECURITY_INFORMATION SecurityInformationClass,
     _Out_ PVOID* Buffer,
     _Out_opt_ PULONG ReturnLength);
+
+typedef VOID(CALLBACK* pfnPopupMenuHandler)(
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_opt_ PVOID lpUserParam
+    );
+
+VOID supHandleContextMenuMsgForListView(
+    _In_ HWND hwndDlg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam,
+    _In_ HWND hwndControl,
+    _In_ pfnPopupMenuHandler MenuHandler,
+    _In_opt_ PVOID lpUserParam);

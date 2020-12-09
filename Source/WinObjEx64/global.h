@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       GLOBAL.H
 *
 *  VERSION:     1.88
 *
-*  DATE:        30 Nov 2020
+*  DATE:        05 Dec 2020
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -31,7 +31,6 @@
 #pragma warning(disable: 4005) // macro redefinition
 #pragma warning(disable: 4091) // 'typedef ': ignored on left of '%s' when no variable is declared
 #pragma warning(disable: 4201) // nameless struct/union
-#pragma warning(disable: 6255 6263) // alloca
 #pragma warning(disable: 6320) // Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER.
 #pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up.
 
